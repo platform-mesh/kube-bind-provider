@@ -1,0 +1,148 @@
+apiVersion: ui.platform-mesh.io/v1alpha1
+kind: ContentConfiguration
+metadata:
+  labels:
+    ui.platform-mesh.io/entity: core_platform-mesh_io_account
+    ui.platform-mesh.io/content-for: kube-bind.io
+  name: kube-bind-ui
+spec:
+  inlineConfiguration:
+    content: |-
+      {
+          "name": "bindableResourcesRequests",
+          "luigiConfigFragment": {
+              "data": {
+                  "nodes": [
+                      {
+                          "pathSegment": "kube-bind_io_bindableresourcesrequests",
+                          "navigationContext": "kube-bind_io_bindableresourcesrequests",
+                          "label": "Bindable Resources Requests",
+                          "icon": "request",
+                          "order": 802,
+                          "entityType": "main.core_platform-mesh_io_account.namespace",
+                          "loadingIndicator": {
+                              "enabled": false
+                          },
+                          "keepSelectedForChildren": true,
+                          "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                          "webcomponent": {
+                              "selfRegistered": true
+                          },
+                          "context": {
+                              "resourceDefinition": {
+                                  "group": "kube-bind.io",
+                                  "plural": "bindableResourcesRequests",
+                                  "singular": "bindableResourcesRequest",
+                                  "version": "v1alpha2",
+                                  "kind": "BindableResourcesRequest",
+                                  "scope": "Namespaced",
+                                  "namespace": null,
+                                  "readyCondition": {
+                                    "jsonPathExpression": "status.phase",
+                                    "property": ["status.phase"]
+                                  },
+                                  "ui": {
+                                      "logoUrl": "https://www.kcp.io/icons/logo.svg",
+                                      "listView": {
+                                          "fields": [
+                                              {
+                                                  "label": "Name",
+                                                  "property": "metadata.name"
+                                              },
+                                              {
+                                                  "label": "Author",
+                                                  "property": "spec.author"
+                                              },
+                                              {
+                                                  "label": "Cluster Identity",
+                                                  "property": "spec.clusterIdentity.identity"
+                                              },
+                                              {
+                                                  "label": "Phase",
+                                                  "property": "status.phase"
+                                              }
+                                          ]
+                                      },
+                                      "detailView": {
+                                          "fields": [
+                                              {
+                                                  "label": "Name",
+                                                  "property": "metadata.name"
+                                              }
+                                          ]
+                                      },
+                                      "createView": {
+                                          "fields": [
+                                              {
+                                                  "label": "Name",
+                                                  "property": "metadata.name",
+                                                  "required": true
+                                              },
+                                              {
+                                                  "label": "Author",
+                                                  "property": "spec.author",
+                                                  "required": false
+                                              },
+                                              {
+                                                  "label": "Cluster Identity",
+                                                  "property": "spec.clusterIdentity.identity",
+                                                  "required": true
+                                              },
+                                              {
+                                                  "label": "Kubeconfig Secret Name",
+                                                  "property": "spec.kubeconfigSecretRef.name",
+                                                  "required": true
+                                              },
+                                              {
+                                                  "label": "Kubeconfig Secret Key",
+                                                  "property": "spec.kubeconfigSecretRef.key",
+                                                  "required": true
+                                              }
+                                          ]
+                                      }
+                                  }
+                              }
+                          },
+                          "children": [
+                            {
+                                "pathSegment": ":requestId",
+                                "hideFromNav": true,
+                                "keepSelectedForChildren": false,
+                                "defineEntity": {
+                                    "id": "kube-bind_io_bindableresourcesrequest",
+                                    "contextKey": "requestId",
+                                    "graphqlEntity": {
+                                        "group": "kube-bind_io",
+                                        "version": "v1alpha2",
+                                        "kind": "BindableResourcesRequest",
+                                        "query": "{ metadata { name } }"
+                                    }
+                                },
+                                "context": {
+                                    "accountId": ":accountId",
+                                    "requestId": ":requestId",
+                                    "resourceId": ":requestId"
+                                }
+                            }
+                          ]
+                      },
+                      {
+                        "entityType": "main.core_platform-mesh_io_account.namespace.kube-bind_io_bindableresourcesrequest",
+                        "pathSegment": "dashboard",
+                        "label": "Dashboard",
+                        "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                        "webcomponent": {
+                          "selfRegistered": true
+                        },
+                        "defineEntity": {
+                            "id": "dashboard"
+                        },
+                        "compound": {
+                            "children": []
+                        }
+                      }
+                  ]
+              }
+          }
+      }
+    contentType: json

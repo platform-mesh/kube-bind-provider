@@ -1,0 +1,25 @@
+# Go workspace files
+go.work
+go.work.sum
+
+# Binaries
+init
+backend
+
+# Kubeconfig files
+*.kubeconfig
+admin.kubeconfig
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude settings
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
