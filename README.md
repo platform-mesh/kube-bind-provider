@@ -30,6 +30,7 @@ TODO: Add how to run this outside platform-mesh as container using upstream helm
 go run github.com/kube-bind/kube-bind/cmd/backend \
   --multicluster-runtime-provider kcp \
   --apiexport-endpoint-slice-name=kube-bind.io \
+  --external-address=https://frontproxy-front-proxy.platform-mesh-system:6443 \
   --pretty-name="PlatformMesh.io" \
   --frontend-disabled=true \
   --namespace-prefix="kube-bind-" \
@@ -38,5 +39,41 @@ go run github.com/kube-bind/kube-bind/cmd/backend \
   --isolation=None
 ```
 
-TODO:
-We need a way to produce Templates for services too. Some kind of modular UI or PM specific controller. Maybe a kube-bind/kcp converting apiexport to a template.
+## Portal UI
+
+This repository includes a custom Angular portal microfrontend for managing BindableResourcesRequest resources.
+
+### Running the Portal locally
+
+```bash
+cd portal
+npm install
+npm start
+```
+
+The dev server will start at `http://localhost:4200`. The portal integrates with the Platform Mesh Portal via Luigi microfrontend framework.
+
+### Portal Features
+
+- List all binding requests with a tile-based grid view
+- Create new binding requests with required fields:
+  - Name
+  - Namespace
+  - Cluster Identity
+  - Kubeconfig Secret Name/Key
+- Delete binding requests with confirmation
+- Phase status badges (pending, success, error)
+
+### Building for Production
+
+```bash
+cd portal
+npm run build
+```
+
+The production build will be output to `portal/dist/`.
+
+## TODO
+
+- Add containerized backend deployment (Helm chart)
+- We need a way to produce Templates for services too. Some kind of modular UI or PM specific controller. Maybe a kube-bind/kcp converting apiexport to a template.
