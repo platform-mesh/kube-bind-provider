@@ -1,0 +1,108 @@
+<ui5-dynamic-page>
+  <ui5-dynamic-page-title slot="titleArea">
+    <ui5-title slot="heading" level="H3">Cluster Bindings</ui5-title>
+
+    <div slot="snappedHeading" class="snapped-heading">
+      <ui5-avatar size="S" shape="Square" initials="KB" colorScheme="Accent3"></ui5-avatar>
+      <div class="snapped-heading-text">
+        <ui5-title level="H5">Cluster Bindings</ui5-title>
+        <ui5-label>Kube Bind</ui5-label>
+      </div>
+    </div>
+
+    <ui5-label slot="subheading">View active cluster bindings</ui5-label>
+
+    <ui5-toolbar slot="actionsBar" design="Transparent">
+      <ui5-toolbar-button text="Refresh" design="Transparent" icon="refresh" (click)="loadClusterBindings()"></ui5-toolbar-button>
+    </ui5-toolbar>
+  </ui5-dynamic-page-title>
+
+  <ui5-dynamic-page-header slot="headerArea">
+    <div class="header-content">
+      <ui5-avatar size="XL" shape="Square" initials="KB" colorScheme="Accent3"></ui5-avatar>
+
+      <div class="header-status-block">
+        <div class="status-title">Cluster Bindings</div>
+        <div class="object-number">
+          <span class="number">{{ clusterBindings().length }}</span>
+        </div>
+      </div>
+    </div>
+  </ui5-dynamic-page-header>
+
+  <div class="bindings-section">
+    @if (loading()) {
+      <div class="loading-state">
+        <ui5-text>Loading cluster bindings...</ui5-text>
+      </div>
+    } @else if (clusterBindings().length === 0) {
+      <div class="empty-state">
+        <ui5-icon name="chain-link" class="empty-icon"></ui5-icon>
+        <ui5-title level="H5">No Cluster Bindings</ui5-title>
+        <ui5-text>Cluster bindings appear here once remote clusters complete the binding process.</ui5-text>
+        <div class="help-text">
+          <ui5-text>Create a binding request first, then follow the instructions to complete the binding on your remote cluster.</ui5-text>
+        </div>
+      </div>
+    } @else {
+      <div class="bindings-grid">
+        @for (cb of clusterBindings(); track cb.metadata.name) {
+          <div class="binding-tile" [class]="getHealthClass(cb)" [class.highlighted]="isHighlighted(cb)">
+            <div class="tile-header">
+              <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(cb.metadata.name) }}"
+                [colorScheme]="getColorScheme(cb.metadata.name)"></ui5-avatar>
+              <div class="tile-title">
+                <ui5-title level="H6">{{ cb.metadata.name }}</ui5-title>
+                <ui5-label class="namespace-label">{{ cb.metadata.namespace || 'default' }}</ui5-label>
+              </div>
+              <div class="tile-actions">
+                <ui5-button icon="delete" design="Transparent" tooltip="Delete" (click)="deleteClusterBinding(cb, $event)"></ui5-button>
+              </div>
+            </div>
+
+            <div class="tile-content">
+              @if (cb.spec.providerPrettyName) {
+                <div class="tile-field">
+                  <ui5-label>Provider</ui5-label>
+                  <ui5-text>{{ cb.spec.providerPrettyName }}</ui5-text>
+                </div>
+              }
+              @if (cb.spec.kubeconfigSecretRef?.name) {
+                <div class="tile-field">
+                  <ui5-label>Kubeconfig Secret</ui5-label>
+                  <ui5-text>{{ cb.spec.kubeconfigSecretRef?.name }}</ui5-text>
+                </div>
+              }
+              @if (cb.status?.konnectorVersion) {
+                <div class="tile-field">
+                  <ui5-label>Konnector Version</ui5-label>
+                  <ui5-text>{{ cb.status?.konnectorVersion }}</ui5-text>
+                </div>
+              }
+              <div class="tile-field">
+                <ui5-label>Status</ui5-label>
+                <div class="status-wrapper">
+                  <ui5-icon [name]="getHealthIcon(cb)" class="status-icon" [class]="getHealthClass(cb)"></ui5-icon>
+                  <span class="status-badge" [class]="getHealthClass(cb)">
+                    {{ getHealthStatus(cb) }}
+                  </span>
+                </div>
+              </div>
+              @if (cb.status?.lastHeartbeatTime) {
+                <div class="tile-field">
+                  <ui5-label>Last Heartbeat</ui5-label>
+                  <ui5-text>{{ formatDate(cb.status?.lastHeartbeatTime) }}</ui5-text>
+                </div>
+              }
+            </div>
+
+            <div class="tile-footer">
+              <ui5-icon name="calendar" class="footer-icon"></ui5-icon>
+              <ui5-label>{{ formatDate(cb.metadata.creationTimestamp) }}</ui5-label>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</ui5-dynamic-page>

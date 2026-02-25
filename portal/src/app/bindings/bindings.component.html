@@ -1,0 +1,346 @@
+<!--
+  Cluster Bindings Management UI - Kube Bind Portal
+
+  This UI allows users to:
+  1. View all binding requests (BindableResourcesRequest)
+  2. View all cluster bindings (ClusterBinding)
+  3. Connect new clusters by providing cluster identity
+  4. Link binding requests to their corresponding cluster bindings
+-->
+<ui5-dynamic-page>
+  <ui5-dynamic-page-title slot="titleArea">
+    <ui5-title slot="heading" level="H3">{{ activeTab() === 'requests' ? 'Binding Requests' : 'Cluster Bindings' }}</ui5-title>
+
+    <div slot="snappedHeading" class="snapped-heading">
+      <ui5-avatar size="S" shape="Square" initials="KB" colorScheme="Accent3"></ui5-avatar>
+      <div class="snapped-heading-text">
+        <ui5-title level="H5">{{ activeTab() === 'requests' ? 'Binding Requests' : 'Cluster Bindings' }}</ui5-title>
+        <ui5-label>Kube Bind</ui5-label>
+      </div>
+    </div>
+
+    <ui5-label slot="subheading">{{ activeTab() === 'requests' ? 'Manage cluster binding requests' : 'View active cluster bindings' }}</ui5-label>
+
+    <ui5-toolbar slot="actionsBar" design="Transparent">
+      @if (activeTab() === 'requests') {
+        <ui5-toolbar-button text="Connect Cluster" design="Emphasized" icon="add" (click)="openAddDialog()"></ui5-toolbar-button>
+      }
+      <ui5-toolbar-button text="Refresh" design="Transparent" icon="refresh" (click)="loadBindings(); loadClusterBindings()"></ui5-toolbar-button>
+    </ui5-toolbar>
+  </ui5-dynamic-page-title>
+
+  <ui5-dynamic-page-header slot="headerArea">
+    <div class="header-content">
+      <ui5-avatar size="XL" shape="Square" initials="KB" colorScheme="Accent3"></ui5-avatar>
+
+      <div class="header-info-block">
+        <div class="install-info">
+          <ui5-label>Install kube-bind CLI:</ui5-label>
+          <div class="command-block">
+            <pre class="command">kubectl krew index add bind https://github.com/kube-bind/krew-index.git
+kubectl krew install bind/bind</pre>
+            <ui5-button icon="copy" design="Transparent" tooltip="Copy to clipboard" (click)="copyInstallCommands()"></ui5-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-status-block">
+        <div class="status-title">Binding Requests</div>
+        <div class="object-number">
+          <span class="number">{{ bindings().length }}</span>
+        </div>
+      </div>
+
+      <div class="header-status-block">
+        <div class="status-title">Cluster Bindings</div>
+        <div class="object-number">
+          <span class="number">{{ clusterBindings().length }}</span>
+        </div>
+      </div>
+    </div>
+  </ui5-dynamic-page-header>
+
+  <!-- Main content area -->
+  <div class="bindings-section">
+    <!-- Binding Requests View -->
+    @if (activeTab() === 'requests') {
+      @if (loading()) {
+        <div class="loading-state">
+          <ui5-text>Loading binding requests...</ui5-text>
+        </div>
+      } @else if (bindings().length === 0) {
+        <div class="empty-state">
+          <ui5-icon name="connected" class="empty-icon"></ui5-icon>
+          <ui5-title level="H5">No Binding Requests</ui5-title>
+          <ui5-text>Click "Connect Cluster" to create a new binding request.</ui5-text>
+          <div class="help-text">
+            <ui5-text>To get your cluster identity, run on your remote cluster:</ui5-text>
+            <code class="command">kubectl bind cluster-identity</code>
+          </div>
+        </div>
+      } @else {
+        <div class="bindings-grid">
+          @for (binding of bindings(); track binding.metadata.name) {
+            <div class="binding-tile" [class]="getPhaseClass(binding.status?.phase)" (click)="openBindingDetails(binding)">
+              <div class="tile-header">
+                <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(binding.metadata.name) }}"
+                  [colorScheme]="getColorScheme(binding.metadata.name)"></ui5-avatar>
+                <div class="tile-title">
+                  <ui5-title level="H6">{{ binding.metadata.name }}</ui5-title>
+                  <ui5-label class="namespace-label">{{ binding.metadata.namespace || 'default' }}</ui5-label>
+                </div>
+                <div class="tile-actions">
+                  <ui5-button icon="delete" design="Transparent" tooltip="Delete" (click)="deleteBinding(binding); $event.stopPropagation()"></ui5-button>
+                </div>
+              </div>
+
+              <div class="tile-content">
+                <div class="tile-field">
+                  <ui5-label>Cluster Identity</ui5-label>
+                  <ui5-text title="{{ binding.spec.clusterIdentity.identity }}">{{ truncateIdentity(binding.spec.clusterIdentity.identity) }}</ui5-text>
+                </div>
+                <div class="tile-field">
+                  <ui5-label>Author</ui5-label>
+                  <ui5-text>{{ binding.spec.author || 'Unknown' }}</ui5-text>
+                </div>
+                <div class="tile-field">
+                  <ui5-label>Status</ui5-label>
+                  <div class="status-wrapper">
+                    <ui5-icon [name]="getPhaseIcon(binding.status?.phase)" class="status-icon" [class]="getPhaseClass(binding.status?.phase)"></ui5-icon>
+                    <span class="status-badge" [class]="getPhaseClass(binding.status?.phase)">
+                      {{ binding.status?.phase || 'Pending' }}
+                    </span>
+                  </div>
+                </div>
+                @if (hasLinkedClusterBinding(binding)) {
+                  <div class="tile-field linked-binding">
+                    <ui5-label>Linked Binding</ui5-label>
+                    <ui5-text class="link-text">{{ getLinkedClusterBinding(binding)?.metadata?.name }}</ui5-text>
+                  </div>
+                }
+              </div>
+
+              <div class="tile-footer">
+                <ui5-icon name="calendar" class="footer-icon"></ui5-icon>
+                <ui5-label>{{ formatDate(binding.metadata.creationTimestamp) }}</ui5-label>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+
+    <!-- Cluster Bindings View -->
+    @if (activeTab() === 'bindings') {
+      @if (clusterBindingsLoading()) {
+        <div class="loading-state">
+          <ui5-text>Loading cluster bindings...</ui5-text>
+        </div>
+      } @else if (clusterBindings().length === 0) {
+        <div class="empty-state">
+          <ui5-icon name="chain-link" class="empty-icon"></ui5-icon>
+          <ui5-title level="H5">No Cluster Bindings</ui5-title>
+          <ui5-text>Cluster bindings appear here once remote clusters complete the binding process.</ui5-text>
+          <div class="help-text">
+            <ui5-text>Create a binding request first, then follow the instructions to complete the binding on your remote cluster.</ui5-text>
+          </div>
+        </div>
+      } @else {
+        <div class="bindings-grid">
+          @for (cb of clusterBindings(); track cb.metadata.name) {
+            <div class="binding-tile" [class]="getHealthClass(cb)">
+              <div class="tile-header">
+                <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(cb.metadata.name) }}"
+                  [colorScheme]="getColorScheme(cb.metadata.name)"></ui5-avatar>
+                <div class="tile-title">
+                  <ui5-title level="H6">{{ cb.metadata.name }}</ui5-title>
+                  <ui5-label class="namespace-label">{{ cb.metadata.namespace || 'default' }}</ui5-label>
+                </div>
+              </div>
+
+              <div class="tile-content">
+                @if (cb.spec.providerPrettyName) {
+                  <div class="tile-field">
+                    <ui5-label>Provider</ui5-label>
+                    <ui5-text>{{ cb.spec.providerPrettyName }}</ui5-text>
+                  </div>
+                }
+                @if (cb.spec.kubeconfigSecretRef?.name) {
+                  <div class="tile-field">
+                    <ui5-label>Kubeconfig Secret</ui5-label>
+                    <ui5-text>{{ cb.spec.kubeconfigSecretRef?.name }}</ui5-text>
+                  </div>
+                }
+                @if (cb.status?.konnectorVersion) {
+                  <div class="tile-field">
+                    <ui5-label>Konnector Version</ui5-label>
+                    <ui5-text>{{ cb.status?.konnectorVersion }}</ui5-text>
+                  </div>
+                }
+                <div class="tile-field">
+                  <ui5-label>Status</ui5-label>
+                  <div class="status-wrapper">
+                    <ui5-icon [name]="getHealthIcon(cb)" class="status-icon" [class]="getHealthClass(cb)"></ui5-icon>
+                    <span class="status-badge" [class]="getHealthClass(cb)">
+                      {{ getHealthStatus(cb) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tile-footer">
+                <ui5-icon name="calendar" class="footer-icon"></ui5-icon>
+                <ui5-label>{{ formatDate(cb.metadata.creationTimestamp) }}</ui5-label>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</ui5-dynamic-page>
+
+<!-- Connect Cluster Dialog -->
+<ui5-dialog
+  header-text="Connect External Cluster"
+  [open]="showAddDialog()"
+  (close)="closeAddDialog()"
+>
+  <div class="dialog-content">
+    <div class="dialog-info">
+      <ui5-icon name="hint" class="info-icon"></ui5-icon>
+      <div class="info-text">
+        <ui5-text>To get your cluster identity, run this command on your remote cluster:</ui5-text>
+        <code class="command">kubectl bind cluster-identity</code>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <ui5-label for="cluster-namespace" required>Namespace</ui5-label>
+      <ui5-select
+        id="cluster-namespace"
+        (change)="onNamespaceChange($event)"
+      >
+        @for (ns of namespaces(); track ns.metadata.name) {
+          <ui5-option [value]="ns.metadata.name" [selected]="ns.metadata.name === newClusterNamespace()">
+            {{ ns.metadata.name }}
+          </ui5-option>
+        }
+      </ui5-select>
+    </div>
+
+    <div class="form-field">
+      <ui5-label for="cluster-name" required>Cluster Name</ui5-label>
+      <ui5-input
+        id="cluster-name"
+        placeholder="my-production-cluster"
+        [value]="newClusterName()"
+        (input)="onClusterNameInput($event)"
+      ></ui5-input>
+      <ui5-label class="field-hint">A friendly name to identify this cluster</ui5-label>
+    </div>
+
+    <div class="form-field">
+      <ui5-label for="cluster-identity" required>Cluster Identity</ui5-label>
+      <ui5-input
+        id="cluster-identity"
+        placeholder="e.g., 0ac6800e-bc4f-4c70-814b-45b44e04aa02"
+        [value]="newClusterIdentity()"
+        (input)="onClusterIdentityInput($event)"
+      ></ui5-input>
+      <ui5-label class="field-hint">Run <code>kubectl bind cluster-identity</code> on your remote cluster to get this value</ui5-label>
+    </div>
+
+    <div class="form-field">
+      <ui5-label for="cluster-ttl">Request Validity</ui5-label>
+      <ui5-select
+        id="cluster-ttl"
+        (change)="onTTLChange($event)"
+      >
+        @for (option of ttlOptions; track option.value) {
+          <ui5-option [value]="option.value" [selected]="option.value === newClusterTTL()">
+            {{ option.label }}
+          </ui5-option>
+        }
+      </ui5-select>
+      <ui5-label class="field-hint">How long the binding request remains valid before expiring</ui5-label>
+    </div>
+  </div>
+
+  <div slot="footer" class="dialog-footer">
+    <ui5-button design="Transparent" (click)="closeAddDialog()">Cancel</ui5-button>
+    <ui5-button design="Emphasized" (click)="confirmAddCluster()">Connect</ui5-button>
+  </div>
+</ui5-dialog>
+
+<!-- Binding Details Dialog -->
+<ui5-dialog
+  header-text="Binding Instructions"
+  [open]="showDetailsDialog()"
+  (close)="closeDetailsDialog()"
+  class="details-dialog"
+>
+  <div class="dialog-content details-content">
+    @if (selectedBinding()) {
+      <div class="binding-info-header">
+        <ui5-avatar size="M" shape="Circle" [initials]="getInitials(selectedBinding()!.metadata.name)"
+          [colorScheme]="getColorScheme(selectedBinding()!.metadata.name)"></ui5-avatar>
+        <div>
+          <ui5-title level="H5">{{ selectedBinding()!.metadata.name }}</ui5-title>
+          <ui5-label>{{ selectedBinding()!.metadata.namespace || 'default' }}</ui5-label>
+        </div>
+        <div class="status-wrapper">
+          <ui5-icon [name]="getPhaseIcon(selectedBinding()!.status?.phase)" class="status-icon" [class]="getPhaseClass(selectedBinding()!.status?.phase)"></ui5-icon>
+          <span class="status-badge" [class]="getPhaseClass(selectedBinding()!.status?.phase)">
+            {{ selectedBinding()!.status?.phase || 'Pending' }}
+          </span>
+        </div>
+      </div>
+
+      @if (selectedBinding()!.status?.phase === 'Succeeded') {
+        <!-- Step 1: Apply binding response -->
+        <div class="instruction-block">
+          <div class="instruction-header">
+            <span class="step-number">1</span>
+            <ui5-title level="H6">Apply binding response to remote cluster</ui5-title>
+          </div>
+          <div class="instruction-content">
+            <ui5-text>Use Platform Mesh kubeconfig to get the binding response and apply it to your remote cluster:</ui5-text>
+            <div class="command-block">
+              <pre class="command">kubectl get secret {{ selectedBinding()!.status?.kubeconfigSecretRef?.name }} -n {{ selectedBinding()!.metadata.namespace || 'default' }} -o jsonpath='{{ '{' }}.data.response{{ '}' }}' | base64 -d | KUBECONFIG=remote kubectl apply -f -</pre>
+              <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyApplyCommand()"></ui5-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Download and deploy -->
+        <div class="instruction-block">
+          <div class="instruction-header">
+            <span class="step-number">2</span>
+            <ui5-title level="H6">Download and deploy binding</ui5-title>
+          </div>
+          <div class="instruction-content">
+            <ui5-text>Download the binding file and deploy it using kubectl bind:</ui5-text>
+            <div class="download-section">
+              <ui5-button design="Emphasized" icon="download" (click)="downloadBindingFile()">Download {{ selectedBinding()!.metadata.name }}-binding.json</ui5-button>
+              <ui5-button design="Transparent" icon="copy" (click)="copyBindingFile()">Copy</ui5-button>
+            </div>
+            <div class="command-block">
+              <pre class="command">kubectl bind deploy --file {{ selectedBinding()!.metadata.name }}-binding.json</pre>
+              <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyDeployCommand()"></ui5-button>
+            </div>
+          </div>
+        </div>
+      } @else {
+        <div class="pending-info">
+          <ui5-icon name="hint" class="info-icon"></ui5-icon>
+          <ui5-text>Binding is not yet ready. Instructions will appear once the status becomes "Succeeded".</ui5-text>
+        </div>
+      }
+    }
+  </div>
+
+  <div slot="footer" class="dialog-footer">
+    <ui5-button design="Emphasized" (click)="closeDetailsDialog()">Close</ui5-button>
+  </div>
+</ui5-dialog>
