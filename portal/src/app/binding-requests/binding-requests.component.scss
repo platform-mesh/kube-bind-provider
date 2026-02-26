@@ -623,3 +623,73 @@ ui5-table-header-cell ui5-text {
     font-size: 0.875rem;
   }
 }
+
+.option-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  background: var(--sapBrandColor);
+  color: var(--sapContent_ContrastTextColor);
+  border-radius: 0.25rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--sapGroup_ContentBorderColor);
+  }
+
+  .or-text {
+    padding: 0 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--sapNeutralTextColor);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.success-info {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.5rem;
+  background: var(--sapPositiveBackground);
+  border-radius: 0.5rem;
+  border: 1px solid var(--sapPositiveBorderColor);
+  margin-top: 1rem;
+
+  .success-icon {
+    font-size: 2rem;
+    color: var(--sapPositiveColor);
+  }
+
+  .success-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    ui5-title {
+      color: var(--sapPositiveTextColor);
+    }
+
+    ui5-text {
+      font-size: 0.875rem;
+      color: var(--sapTextColor);
+    }
+  }
+}

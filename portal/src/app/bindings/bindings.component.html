@@ -298,36 +298,41 @@ kubectl krew install bind/bind</pre>
       </div>
 
       @if (selectedBinding()!.status?.phase === 'Succeeded') {
-        <!-- Step 1: Apply binding response -->
+        <!-- Option 1: Download and deploy -->
         <div class="instruction-block">
           <div class="instruction-header">
-            <span class="step-number">1</span>
-            <ui5-title level="H6">Apply binding response to remote cluster</ui5-title>
-          </div>
-          <div class="instruction-content">
-            <ui5-text>Use Platform Mesh kubeconfig to get the binding response and apply it to your remote cluster:</ui5-text>
-            <div class="command-block">
-              <pre class="command">kubectl get secret {{ selectedBinding()!.status?.kubeconfigSecretRef?.name }} -n {{ selectedBinding()!.metadata.namespace || 'default' }} -o jsonpath='{{ '{' }}.data.response{{ '}' }}' | base64 -d | KUBECONFIG=remote kubectl apply -f -</pre>
-              <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyApplyCommand()"></ui5-button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: Download and deploy -->
-        <div class="instruction-block">
-          <div class="instruction-header">
-            <span class="step-number">2</span>
+            <span class="option-label">Option A</span>
             <ui5-title level="H6">Download and deploy binding</ui5-title>
           </div>
           <div class="instruction-content">
-            <ui5-text>Download the binding file and deploy it using kubectl bind:</ui5-text>
+            <ui5-text>Download the binding file and deploy it on your remote cluster:</ui5-text>
             <div class="download-section">
               <ui5-button design="Emphasized" icon="download" (click)="downloadBindingFile()">Download {{ selectedBinding()!.metadata.name }}-binding.json</ui5-button>
               <ui5-button design="Transparent" icon="copy" (click)="copyBindingFile()">Copy</ui5-button>
             </div>
             <div class="command-block">
-              <pre class="command">kubectl bind deploy --file {{ selectedBinding()!.metadata.name }}-binding.json</pre>
+              <pre class="command">kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-{{ selectedBinding()!.metadata.name }} --file {{ selectedBinding()!.metadata.name }}-binding.json</pre>
               <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyDeployCommand()"></ui5-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- OR divider -->
+        <div class="or-divider">
+          <span class="or-text">OR</span>
+        </div>
+
+        <!-- Option 2: Pipe from secret -->
+        <div class="instruction-block">
+          <div class="instruction-header">
+            <span class="option-label">Option B</span>
+            <ui5-title level="H6">Deploy directly from secret</ui5-title>
+          </div>
+          <div class="instruction-content">
+            <ui5-text>Fetch the binding response and pipe it directly to kubectl bind deploy:</ui5-text>
+            <div class="command-block">
+              <pre class="command">kubectl get secret {{ selectedBinding()!.status?.kubeconfigSecretRef?.name }} -n {{ selectedBinding()!.metadata.namespace || 'default' }} -o jsonpath='{{ '{' }}.data.response{{ '}' }}' | base64 -d | kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-{{ selectedBinding()!.metadata.name }} -f -</pre>
+              <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyApplyCommand()"></ui5-button>
             </div>
           </div>
         </div>
