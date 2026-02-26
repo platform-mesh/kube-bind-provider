@@ -12,6 +12,7 @@ import { ILuigiContextTypes, LuigiContextService } from '@luigi-project/client-s
 import {
   AvatarComponent,
   ButtonComponent,
+  DialogComponent,
   DynamicPageComponent,
   DynamicPageHeaderComponent,
   DynamicPageTitleComponent,
@@ -27,6 +28,7 @@ import {
 import '@ui5/webcomponents-icons/dist/calendar.js';
 import '@ui5/webcomponents-icons/dist/chain-link.js';
 import '@ui5/webcomponents-icons/dist/connected.js';
+import '@ui5/webcomponents-icons/dist/copy.js';
 import '@ui5/webcomponents-icons/dist/delete.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/refresh.js';
@@ -49,6 +51,7 @@ import { BindingsService, ClusterBinding } from '../bindings/bindings.service';
     ToolbarButtonComponent,
     IconComponent,
     ButtonComponent,
+    DialogComponent,
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './cluster-bindings.component.html',
@@ -69,6 +72,10 @@ export class ClusterBindingsComponent {
   // Highlighted binding from query params (namespace/name)
   public highlightedNamespace = signal<string | null>(null);
   public highlightedName = signal<string | null>(null);
+
+  // Cluster Binding details dialog
+  public showClusterBindingDetailsDialog = signal<boolean>(false);
+  public selectedClusterBinding = signal<ClusterBinding | null>(null);
 
   constructor() {
     effect(() => {
@@ -297,5 +304,87 @@ export class ClusterBindingsComponent {
       .catch(() => {
         console.log('Cluster binding deletion cancelled');
       });
+  }
+
+  // Cluster Binding Details Dialog methods
+  public openClusterBindingDetails(cb: ClusterBinding): void {
+    this.selectedClusterBinding.set(cb);
+    this.showClusterBindingDetailsDialog.set(true);
+  }
+
+  public closeClusterBindingDetailsDialog(): void {
+    this.showClusterBindingDetailsDialog.set(false);
+    this.selectedClusterBinding.set(null);
+  }
+
+  public copyClusterBindingCommand(): void {
+    const cb = this.selectedClusterBinding();
+    if (!cb?.status?.consumerSecretRef) return;
+
+    const command = `kubectl apply -f - <<EOF
+apiVersion: kube-bind.io/v1alpha2
+kind: APIServiceBindingBundle
+metadata:
+  name: all-bindings
+spec:
+  kubeconfigSecretRef:
+    key: kubeconfig
+    name: ${cb.status.consumerSecretRef.name}
+    namespace: ${cb.status.consumerSecretRef.namespace}
+EOF`;
+    this.copyToClipboard(command, 'Command copied to clipboard');
+  }
+
+  private copyToClipboard(text: string, successMessage: string): void {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(
+        () => {
+          LuigiClient.uxManager().showAlert({
+            text: successMessage,
+            type: 'success',
+            closeAfter: 2000,
+          });
+        },
+        () => this.fallbackCopyToClipboard(text, successMessage)
+      );
+    } else {
+      this.fallbackCopyToClipboard(text, successMessage);
+    }
+  }
+
+  private fallbackCopyToClipboard(text: string, successMessage: string): void {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        LuigiClient.uxManager().showAlert({
+          text: successMessage,
+          type: 'success',
+          closeAfter: 2000,
+        });
+      } else {
+        LuigiClient.uxManager().showAlert({
+          text: 'Failed to copy to clipboard',
+          type: 'error',
+          closeAfter: 2000,
+        });
+      }
+    } catch {
+      LuigiClient.uxManager().showAlert({
+        text: 'Failed to copy to clipboard',
+        type: 'error',
+        closeAfter: 2000,
+      });
+    }
+
+    document.body.removeChild(textArea);
   }
 }
