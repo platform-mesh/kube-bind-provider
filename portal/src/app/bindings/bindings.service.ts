@@ -135,6 +135,96 @@ export interface ClusterBindingListResponse {
   };
 }
 
+export interface APIBinding {
+  metadata: {
+    name: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    reference?: {
+      export?: {
+        path?: string;
+        name?: string;
+      };
+    };
+  };
+  status?: {
+    phase?: string;
+    boundResources?: Array<{
+      group: string;
+      resource: string;
+    }>;
+    conditions?: Array<{
+      type: string;
+      status: string;
+      reason?: string;
+      message?: string;
+      lastTransitionTime?: string;
+    }>;
+  };
+}
+
+export interface APIBindingListResponse {
+  apis_kcp_io: {
+    v1alpha1: {
+      APIBindings: {
+        items: APIBinding[];
+      };
+    };
+  };
+}
+
+export interface PermissionClaim {
+  group: string;
+  resource: string;
+  selector?: {
+    labelSelector?: {
+      matchLabels?: Record<string, string>;
+    };
+  };
+}
+
+export interface ExportResource {
+  group: string;
+  resource: string;
+  versions: string[];
+}
+
+export interface APIServiceExportRequest {
+  metadata: {
+    name: string;
+    namespace?: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+  };
+  spec: {
+    permissionClaims?: PermissionClaim[];
+    resources?: ExportResource[];
+  };
+  status?: {
+    phase?: string;
+    conditions?: Array<{
+      type: string;
+      status: string;
+      reason?: string;
+      message?: string;
+      lastTransitionTime?: string;
+    }>;
+  };
+}
+
+export interface APIServiceExportRequestListResponse {
+  kube_bind_io: {
+    v1alpha2: {
+      APIServiceExportRequests: {
+        items: APIServiceExportRequest[];
+      };
+    };
+  };
+}
+
 const LIST_BINDINGS_QUERY = `
   query ListBindings {
     kube_bind_io {
@@ -286,11 +376,129 @@ const DELETE_BINDING_MUTATION = `
   }
 `;
 
+const LIST_API_BINDINGS_QUERY = `
+  query ListAPIBindings {
+    apis_kcp_io {
+      v1alpha1 {
+        APIBindings {
+          items {
+            metadata {
+              name
+              creationTimestamp
+              labels
+              annotations
+            }
+            spec {
+              reference {
+                export {
+                  path
+                  name
+                }
+              }
+            }
+            status {
+              phase
+              boundResources {
+                group
+                resource
+              }
+              conditions {
+                type
+                status
+                reason
+                message
+                lastTransitionTime
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 const DELETE_CLUSTER_BINDING_MUTATION = `
   mutation DeleteClusterBinding($name: String!, $namespace: String!) {
     kube_bind_io {
       v1alpha2 {
         deleteClusterBinding(name: $name, namespace: $namespace)
+      }
+    }
+  }
+`;
+
+const LIST_API_SERVICE_EXPORT_REQUESTS_QUERY = `
+  query ListAPIServiceExportRequests($namespace: String!) {
+    kube_bind_io {
+      v1alpha2 {
+        APIServiceExportRequests(namespace: $namespace) {
+          items {
+            metadata {
+              name
+              namespace
+              creationTimestamp
+              labels
+            }
+            spec {
+              permissionClaims {
+                group
+                resource
+              }
+              resources {
+                group
+                resource
+                versions
+              }
+            }
+            status {
+              phase
+              conditions {
+                type
+                status
+                reason
+                message
+                lastTransitionTime
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const CREATE_API_SERVICE_EXPORT_REQUEST_MUTATION = `
+  mutation CreateAPIServiceExportRequest(
+    $name: String!,
+    $namespace: String!,
+    $resources: [KubeBindIoV1alpha2APIServiceExportRequestspecspecresourcesInput!]
+  ) {
+    kube_bind_io {
+      v1alpha2 {
+        createAPIServiceExportRequest(
+          namespace: $namespace
+          object: {
+            metadata: { name: $name }
+            spec: {
+              resources: $resources
+            }
+          }
+        ) {
+          metadata {
+            name
+            namespace
+          }
+        }
+      }
+    }
+  }
+`;
+
+const DELETE_API_SERVICE_EXPORT_REQUEST_MUTATION = `
+  mutation DeleteAPIServiceExportRequest($name: String!, $namespace: String!) {
+    kube_bind_io {
+      v1alpha2 {
+        deleteAPIServiceExportRequest(name: $name, namespace: $namespace)
       }
     }
   }
@@ -517,6 +725,35 @@ export class BindingsService {
   }
 
   /**
+   * List all APIBindings from kcp workspace.
+   */
+  listAPIBindings(): Observable<APIBinding[]> {
+    console.log('[BindingsService] listAPIBindings called');
+    return this.getGraphQLConfig().pipe(
+      switchMap(({ endpoint, token }) => {
+        console.log('[BindingsService] Fetching API bindings from:', endpoint);
+        return from(
+          fetch(endpoint, {
+            method: 'POST',
+            headers: this.buildHeaders(token),
+            body: JSON.stringify({
+              query: LIST_API_BINDINGS_QUERY,
+            }),
+          }).then((res) => res.json())
+        );
+      }),
+      map((response: { data: APIBindingListResponse }) => {
+        console.log('[BindingsService] APIBindings response:', response);
+        return response.data?.apis_kcp_io?.v1alpha1?.APIBindings?.items || [];
+      }),
+      catchError((error) => {
+        console.error('Error fetching API bindings:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
    * Delete a BindableResourcesRequest.
    */
   deleteBinding(name: string, namespace: string): Observable<boolean> {
@@ -569,6 +806,108 @@ export class BindingsService {
       }),
       catchError((error) => {
         console.error('Error deleting cluster binding:', error);
+        return of(false);
+      })
+    );
+  }
+
+  /**
+   * List all APIServiceExportRequests in a namespace.
+   */
+  listAPIServiceExportRequests(namespace: string): Observable<APIServiceExportRequest[]> {
+    console.log('[BindingsService] listAPIServiceExportRequests called for namespace:', namespace);
+    return this.getGraphQLConfig().pipe(
+      switchMap(({ endpoint, token }) => {
+        console.log('[BindingsService] Fetching API service export requests from:', endpoint);
+        return from(
+          fetch(endpoint, {
+            method: 'POST',
+            headers: this.buildHeaders(token),
+            body: JSON.stringify({
+              query: LIST_API_SERVICE_EXPORT_REQUESTS_QUERY,
+              variables: { namespace },
+            }),
+          }).then((res) => res.json())
+        );
+      }),
+      map((response: { data: APIServiceExportRequestListResponse }) => {
+        console.log('[BindingsService] APIServiceExportRequests response:', response);
+        return response.data?.kube_bind_io?.v1alpha2?.APIServiceExportRequests?.items || [];
+      }),
+      catchError((error) => {
+        console.error('Error fetching API service export requests:', error);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Create a new APIServiceExportRequest.
+   * Note: permissionClaims is currently not supported in the GraphQL schema
+   */
+  createAPIServiceExportRequest(
+    name: string,
+    namespace: string,
+    resources: ExportResource[],
+    _permissionClaims?: PermissionClaim[]
+  ): Observable<boolean> {
+    return this.getGraphQLConfig().pipe(
+      switchMap(({ endpoint, token }) =>
+        from(
+          fetch(endpoint, {
+            method: 'POST',
+            headers: this.buildHeaders(token),
+            body: JSON.stringify({
+              query: CREATE_API_SERVICE_EXPORT_REQUEST_MUTATION,
+              variables: {
+                name,
+                namespace,
+                resources,
+              },
+            }),
+          }).then((res) => res.json())
+        )
+      ),
+      map((response: any) => {
+        if (response.errors) {
+          console.error('GraphQL errors:', response.errors);
+          return false;
+        }
+        return !!response.data?.kube_bind_io?.v1alpha2?.createAPIServiceExportRequest;
+      }),
+      catchError((error) => {
+        console.error('Error creating API service export request:', error);
+        return of(false);
+      })
+    );
+  }
+
+  /**
+   * Delete an APIServiceExportRequest.
+   */
+  deleteAPIServiceExportRequest(name: string, namespace: string): Observable<boolean> {
+    return this.getGraphQLConfig().pipe(
+      switchMap(({ endpoint, token }) =>
+        from(
+          fetch(endpoint, {
+            method: 'POST',
+            headers: this.buildHeaders(token),
+            body: JSON.stringify({
+              query: DELETE_API_SERVICE_EXPORT_REQUEST_MUTATION,
+              variables: { name, namespace },
+            }),
+          }).then((res) => res.json())
+        )
+      ),
+      map((response: any) => {
+        if (response.errors) {
+          console.error('GraphQL errors:', response.errors);
+          return false;
+        }
+        return !!response.data?.kube_bind_io?.v1alpha2?.deleteAPIServiceExportRequest;
+      }),
+      catchError((error) => {
+        console.error('Error deleting API service export request:', error);
         return of(false);
       })
     );

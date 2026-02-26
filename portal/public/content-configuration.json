@@ -22,6 +22,26 @@
           "context": {
             "accountId": ":core_platform-mesh_io_accountId"
           }
+        },
+        {
+          "category": {
+            "label": "Providers",
+            "icon": "building",
+            "collapsible": false
+          },
+          "pathSegment": "service-mappings",
+          "label": "Service Mappings",
+          "hideFromNav": false,
+          "icon": "share-2",
+          "url": "http://localhost:4300/index.html#/service-mappings",
+          "entityType": "main.core_platform-mesh_io_account:1",
+          "order": 901,
+          "loadingIndicator": {
+            "enabled": true
+          },
+          "context": {
+            "accountId": ":core_platform-mesh_io_accountId"
+          }
         }
       ]
     }
