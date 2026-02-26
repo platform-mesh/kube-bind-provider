@@ -75,6 +75,23 @@
   gap: 0.25rem;
   margin-right: 1.5rem;
   margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+
+  &.clickable {
+    cursor: pointer;
+    border: 2px solid transparent;
+
+    &:hover {
+      background: var(--sapList_Hover_Background);
+    }
+
+    &.active {
+      background: var(--sapSelectedColor_light, rgba(0, 112, 217, 0.08));
+      border-color: var(--sapBrandColor);
+    }
+  }
 }
 
 .status-title {

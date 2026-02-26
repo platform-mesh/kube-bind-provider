@@ -12,8 +12,11 @@ replace (
 replace github.com/kube-bind/kube-bind/contrib/kcp => github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-20260218104033-d424f14f193e
 
 require (
+	github.com/kcp-dev/kcp v0.0.0-00010101000000-000000000000
+	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-00010101000000-000000000000
 	github.com/spf13/pflag v1.0.10
+	k8s.io/apimachinery v0.35.1
 	k8s.io/apiserver v0.34.2
 	k8s.io/component-base v0.34.2
 	k8s.io/klog/v2 v2.130.1
@@ -53,8 +56,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.29.1-0.20251209121225-cf3c0b624983 // indirect
 	github.com/kcp-dev/client-go v0.28.1-0.20251112153209-b37f4c1ff9a2 // indirect
-	github.com/kcp-dev/kcp v0.0.0-00010101000000-000000000000 // indirect
-	github.com/kcp-dev/logicalcluster/v3 v3.0.5 // indirect
 	github.com/kcp-dev/sdk v0.28.1-0.20251209130449-436a0347809b // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
@@ -105,7 +106,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.35.1 // indirect
 	k8s.io/apiextensions-apiserver v0.34.2 // indirect
-	k8s.io/apimachinery v0.35.1 // indirect
 	k8s.io/client-go v0.35.1 // indirect
 	k8s.io/kms v0.35.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect

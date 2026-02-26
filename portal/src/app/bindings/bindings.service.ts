@@ -79,6 +79,10 @@ export interface ClusterBinding {
     lastHeartbeatTime?: string;
     heartbeatInterval?: string;
     konnectorVersion?: string;
+    consumerSecretRef?: {
+      name: string;
+      namespace: string;
+    };
     conditions?: Array<{
       type: string;
       status: string;
@@ -228,6 +232,10 @@ const LIST_CLUSTER_BINDINGS_QUERY = `
               lastHeartbeatTime
               heartbeatInterval
               konnectorVersion
+              consumerSecretRef {
+                name
+                namespace
+              }
               conditions {
                 type
                 status

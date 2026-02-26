@@ -120,6 +120,10 @@ export class BindingsComponent {
   public selectedBinding = signal<BindableResourcesRequest | null>(null);
   public bindingResponseContent = signal<string>('');
 
+  // Cluster Binding details dialog
+  public showClusterBindingDetailsDialog = signal<boolean>(false);
+  public selectedClusterBinding = signal<ClusterBinding | null>(null);
+
   constructor() {
     // Try to get current user email for auto-populating author
     this.bindingsService.getCurrentUserEmail().subscribe((email) => {
@@ -610,6 +614,35 @@ export class BindingsComponent {
 
     const command = `kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-${binding.metadata.name} --file ${binding.metadata.name}-binding.json`;
     this.copyToClipboard(command, 'Deploy command copied to clipboard');
+  }
+
+  // Cluster Binding Details Dialog methods
+  public openClusterBindingDetails(cb: ClusterBinding): void {
+    this.selectedClusterBinding.set(cb);
+    this.showClusterBindingDetailsDialog.set(true);
+  }
+
+  public closeClusterBindingDetailsDialog(): void {
+    this.showClusterBindingDetailsDialog.set(false);
+    this.selectedClusterBinding.set(null);
+  }
+
+  public copyClusterBindingCommand(): void {
+    const cb = this.selectedClusterBinding();
+    if (!cb?.status?.consumerSecretRef) return;
+
+    const command = `kubectl apply -f - <<EOF
+apiVersion: kube-bind.io/v1alpha2
+kind: APIServiceBindingBundle
+metadata:
+  name: all-bindings
+spec:
+  kubeconfigSecretRef:
+    key: kubeconfig
+    name: ${cb.status.consumerSecretRef.name}
+    namespace: ${cb.status.consumerSecretRef.namespace}
+EOF`;
+    this.copyToClipboard(command, 'Command copied to clipboard');
   }
 
   public downloadBindingFile(): void {
