@@ -36,7 +36,6 @@ import '@ui5/webcomponents-icons/dist/connected.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/refresh.js';
 import '@ui5/webcomponents-icons/dist/copy.js';
-import '@ui5/webcomponents-icons/dist/download.js';
 import '@ui5/webcomponents-icons/dist/hint.js';
 
 import { BindableResourcesRequest, BindingsService, ClusterBinding, Namespace } from '../bindings/bindings.service';
@@ -335,6 +334,17 @@ export class BindingRequestsComponent {
     return cb.status?.lastHeartbeatTime ? 'connected' : 'hint';
   }
 
+  /**
+   * Check if the linked ClusterBinding is in Ready state.
+   */
+  public isLinkedBindingReady(request: BindableResourcesRequest): boolean {
+    const cb = this.getLinkedClusterBinding(request);
+    if (!cb) return false;
+
+    const readyCondition = cb.status?.conditions?.find(c => c.type === 'Ready');
+    return readyCondition?.status === 'True';
+  }
+
   public openAddDialog(): void {
     this.newClusterName.set('');
     this.newClusterIdentity.set('');
@@ -516,114 +526,17 @@ export class BindingRequestsComponent {
 
     const secretName = binding.status.kubeconfigSecretRef.name;
     const namespace = binding.metadata.namespace || 'default';
-    const command = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.response}' | base64 -d | KUBECONFIG=remote kubectl apply -f -`;
-    this.copyToClipboard(command, 'Apply command copied to clipboard');
+    const bindingName = binding.metadata.name;
+    const command = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.response}' | base64 -d | kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-${bindingName} -f -`;
+    this.copyToClipboard(command, 'Deploy command copied to clipboard');
   }
 
   public copyDeployCommand(): void {
     const binding = this.selectedBinding();
     if (!binding) return;
 
-    const command = `kubectl bind deploy --file ${binding.metadata.name}-binding.json`;
+    const command = `kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-${binding.metadata.name} --file ${binding.metadata.name}-binding.json`;
     this.copyToClipboard(command, 'Deploy command copied to clipboard');
-  }
-
-  public downloadBindingFile(): void {
-    const binding = this.selectedBinding();
-    const content = this.bindingResponseContent();
-
-    if (!binding) {
-      LuigiClient.uxManager().showAlert({
-        text: 'No binding selected',
-        type: 'error',
-        closeAfter: 2000,
-      });
-      return;
-    }
-
-    if (content) {
-      this.performDownload(binding.metadata.name, content);
-      return;
-    }
-
-    if (!binding.status?.kubeconfigSecretRef) {
-      LuigiClient.uxManager().showAlert({
-        text: 'Binding response not yet available',
-        type: 'warning',
-        closeAfter: 2000,
-      });
-      return;
-    }
-
-    const secretRef = binding.status.kubeconfigSecretRef;
-    const namespace = binding.metadata.namespace || 'default';
-
-    this.bindingsService.getSecret(secretRef.name, namespace).subscribe({
-      next: (secret) => {
-        if (secret?.data) {
-          const key = secretRef.key || 'response';
-          let encodedContent = secret.data[key];
-
-          if (!encodedContent && Object.keys(secret.data).length > 0) {
-            encodedContent = secret.data[Object.keys(secret.data)[0]];
-          }
-
-          if (encodedContent) {
-            try {
-              const decodedContent = atob(encodedContent);
-              this.bindingResponseContent.set(decodedContent);
-              this.performDownload(binding.metadata.name, decodedContent);
-            } catch {
-              this.bindingResponseContent.set(encodedContent);
-              this.performDownload(binding.metadata.name, encodedContent);
-            }
-          } else {
-            LuigiClient.uxManager().showAlert({
-              text: `Secret key "${key}" not found`,
-              type: 'error',
-              closeAfter: 3000,
-            });
-          }
-        }
-      },
-      error: () => {
-        LuigiClient.uxManager().showAlert({
-          text: 'Failed to fetch binding response',
-          type: 'error',
-          closeAfter: 2000,
-        });
-      },
-    });
-  }
-
-  private performDownload(name: string, content: string): void {
-    const filename = `${name}-binding.json`;
-
-    try {
-      const blob = new Blob([content], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      LuigiClient.uxManager().showAlert({
-        text: `Downloading ${filename}`,
-        type: 'success',
-        closeAfter: 2000,
-      });
-    } catch (error) {
-      console.error('Download failed:', error);
-      LuigiClient.uxManager().showAlert({
-        text: 'Failed to download file. Try using the Copy button instead.',
-        type: 'error',
-        closeAfter: 3000,
-      });
-    }
   }
 
   public copyBindingFile(): void {
