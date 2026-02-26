@@ -599,15 +599,16 @@ export class BindingsComponent {
 
     const secretName = binding.status.kubeconfigSecretRef.name;
     const namespace = binding.metadata.namespace || 'default';
-    const command = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.response}' | base64 -d | KUBECONFIG=remote kubectl apply -f -`;
-    this.copyToClipboard(command, 'Apply command copied to clipboard');
+    const bindingName = binding.metadata.name;
+    const command = `kubectl get secret ${secretName} -n ${namespace} -o jsonpath='{.data.response}' | base64 -d | kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-${bindingName} -f -`;
+    this.copyToClipboard(command, 'Deploy command copied to clipboard');
   }
 
   public copyDeployCommand(): void {
     const binding = this.selectedBinding();
     if (!binding) return;
 
-    const command = `kubectl bind deploy --file ${binding.metadata.name}-binding.json`;
+    const command = `kubectl bind deploy --provider-kubeconfig-secret-name kubeconfig-${binding.metadata.name} --file ${binding.metadata.name}-binding.json`;
     this.copyToClipboard(command, 'Deploy command copied to clipboard');
   }
 
