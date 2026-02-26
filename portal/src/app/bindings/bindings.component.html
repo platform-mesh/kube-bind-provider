@@ -44,14 +44,14 @@ kubectl krew install bind/bind</pre>
         </div>
       </div>
 
-      <div class="header-status-block">
+      <div class="header-status-block clickable" [class.active]="activeTab() === 'requests'" (click)="activeTab.set('requests')">
         <div class="status-title">Binding Requests</div>
         <div class="object-number">
           <span class="number">{{ bindings().length }}</span>
         </div>
       </div>
 
-      <div class="header-status-block">
+      <div class="header-status-block clickable" [class.active]="activeTab() === 'bindings'" (click)="activeTab.set('bindings')">
         <div class="status-title">Cluster Bindings</div>
         <div class="object-number">
           <span class="number">{{ clusterBindings().length }}</span>
@@ -147,8 +147,8 @@ kubectl krew install bind/bind</pre>
         </div>
       } @else {
         <div class="bindings-grid">
-          @for (cb of clusterBindings(); track cb.metadata.name) {
-            <div class="binding-tile" [class]="getHealthClass(cb)">
+          @for (cb of clusterBindings(); track cb.metadata.namespace + '/' + cb.metadata.name) {
+            <div class="binding-tile" [class]="getHealthClass(cb)" (click)="openClusterBindingDetails(cb)">
               <div class="tile-header">
                 <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(cb.metadata.name) }}"
                   [colorScheme]="getColorScheme(cb.metadata.name)"></ui5-avatar>
@@ -347,5 +347,60 @@ kubectl krew install bind/bind</pre>
 
   <div slot="footer" class="dialog-footer">
     <ui5-button design="Emphasized" (click)="closeDetailsDialog()">Close</ui5-button>
+  </div>
+</ui5-dialog>
+
+<!-- Cluster Binding Details Dialog -->
+<ui5-dialog
+  header-text="Cluster Binding Configuration"
+  [open]="showClusterBindingDetailsDialog()"
+  (close)="closeClusterBindingDetailsDialog()"
+  class="details-dialog"
+>
+  <div class="dialog-content details-content">
+    @if (selectedClusterBinding()) {
+      <div class="binding-info-header">
+        <ui5-avatar size="M" shape="Circle" [initials]="getInitials(selectedClusterBinding()!.metadata.name)"
+          [colorScheme]="getColorScheme(selectedClusterBinding()!.metadata.name)"></ui5-avatar>
+        <div>
+          <ui5-title level="H5">{{ selectedClusterBinding()!.metadata.name }}</ui5-title>
+          <ui5-label>{{ selectedClusterBinding()!.metadata.namespace || 'default' }}</ui5-label>
+        </div>
+        <div class="status-wrapper">
+          <ui5-icon [name]="getHealthIcon(selectedClusterBinding()!)" class="status-icon" [class]="getHealthClass(selectedClusterBinding()!)"></ui5-icon>
+          <span class="status-badge" [class]="getHealthClass(selectedClusterBinding()!)">
+            {{ getHealthStatus(selectedClusterBinding()!) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Configure remote cluster instruction -->
+      <div class="instruction-block">
+        <div class="instruction-header">
+          <ui5-title level="H6">Configure remote consumer cluster to pull all binding contracts</ui5-title>
+        </div>
+        <div class="instruction-content">
+          <ui5-text>Apply this resource on your remote cluster to automatically sync all API bindings:</ui5-text>
+          <div class="command-block">
+            <pre class="command">kubectl apply -f - &lt;&lt;EOF
+apiVersion: kube-bind.io/v1alpha2
+kind: APIServiceBindingBundle
+metadata:
+  name: all-bindings
+spec:
+  kubeconfigSecretRef:
+    key: kubeconfig
+    name: {{ selectedClusterBinding()!.status?.consumerSecretRef?.name }}
+    namespace: {{ selectedClusterBinding()!.status?.consumerSecretRef?.namespace }}
+EOF</pre>
+            <ui5-button icon="copy" design="Transparent" tooltip="Copy command" (click)="copyClusterBindingCommand()"></ui5-button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div slot="footer" class="dialog-footer">
+    <ui5-button design="Emphasized" (click)="closeClusterBindingDetailsDialog()">Close</ui5-button>
   </div>
 </ui5-dialog>
