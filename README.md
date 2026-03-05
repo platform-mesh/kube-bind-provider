@@ -40,3 +40,5 @@ go run github.com/kube-bind/kube-bind/cmd/backend \
 
 TODO:
 We need a way to produce Templates for services too. Some kind of modular UI or PM specific controller. Maybe a kube-bind/kcp converting apiexport to a template.
+
+<p align="center"><img alt="Bundesministerium für Wirtschaft und Energie (BMWE)-EU funding logo" src="https://apeirora.eu/assets/img/BMWK-EU.png" width="400"/></p>
