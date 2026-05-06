@@ -6,7 +6,7 @@ go 1.25.1
 replace (
 	github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.31.1
 	github.com/kcp-dev/kcp => github.com/kcp-dev/kcp v0.0.0-20251211081525-180afa9d0125
-	github.com/kcp-dev/sdk => github.com/kcp-dev/sdk v0.0.0-20251210172228-11364df3071c
+	github.com/kcp-dev/sdk => github.com/kcp-dev/sdk v0.31.1
 )
 
 replace github.com/kube-bind/kube-bind/contrib/kcp => github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-20260218104033-d424f14f193e
