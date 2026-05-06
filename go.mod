@@ -4,7 +4,7 @@ go 1.25.1
 
 // kcp pre-release
 replace (
-	github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.0.0-20251211053925-0c25555f33dd
+	github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.31.1
 	github.com/kcp-dev/kcp => github.com/kcp-dev/kcp v0.0.0-20251211081525-180afa9d0125
 	github.com/kcp-dev/sdk => github.com/kcp-dev/sdk v0.0.0-20251210172228-11364df3071c
 )
