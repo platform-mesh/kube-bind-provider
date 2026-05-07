@@ -9,7 +9,7 @@
 
 backend:
   kubeconfig: "/etc/kube-bind/kubeconfig"
-  externalAddress: "https://frontproxy-front-proxy.platform-mesh-system:6443"
+  externalAddress: "https://frontproxy-front-proxy.platform-mesh-system:8443"
   prettyName: "PlatformMesh.io"
   namespacePrefix: "kube-bind-"
   consumerScope: "cluster"

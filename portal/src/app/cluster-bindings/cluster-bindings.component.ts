@@ -33,6 +33,9 @@ import '@ui5/webcomponents-icons/dist/delete.js';
 import '@ui5/webcomponents-icons/dist/disconnected.js';
 import '@ui5/webcomponents-icons/dist/refresh.js';
 import '@ui5/webcomponents-icons/dist/hint.js';
+import '@ui5/webcomponents-icons/dist/sys-enter-2.js';
+import '@ui5/webcomponents-icons/dist/error.js';
+import '@ui5/webcomponents-icons/dist/pending.js';
 
 import { BindingsService, ClusterBinding } from '../bindings/bindings.service';
 
@@ -261,16 +264,51 @@ export class ClusterBindingsComponent {
     return identity.substring(0, 8) + '...' + identity.substring(identity.length - 4);
   }
 
+  public getClusterPrettyName(cb: ClusterBinding): string {
+    return (
+      cb.metadata.annotations?.['backend.kube-bind.io/cluster-pretty-name'] ||
+      cb.metadata.name
+    );
+  }
+
+  public getAuthor(cb: ClusterBinding): string | undefined {
+    return cb.metadata.annotations?.['backend.kube-bind.io/author'];
+  }
+
+  public getIdentity(cb: ClusterBinding): string | undefined {
+    return cb.metadata.annotations?.['backend.kube-bind.io/identity'];
+  }
+
+  public getConditionClass(cond: { type: string; status: string }): string {
+    if (cond.status === 'True') {
+      return cond.type.toLowerCase().includes('failed') || cond.type.toLowerCase().includes('error')
+        ? 'error'
+        : 'success';
+    }
+    if (cond.status === 'False') {
+      return cond.type === 'Ready' || cond.type === 'Healthy' ? 'error' : 'pending';
+    }
+    return 'pending';
+  }
+
+  public getConditionIcon(cond: { type: string; status: string }): string {
+    const cls = this.getConditionClass(cond);
+    if (cls === 'success') return 'sys-enter-2';
+    if (cls === 'error') return 'error';
+    return 'pending';
+  }
+
   /**
    * Delete a ClusterBinding after confirmation.
    */
   public deleteClusterBinding(cb: ClusterBinding, event: Event): void {
     event.stopPropagation();
+    const prettyName = this.getClusterPrettyName(cb);
     LuigiClient.uxManager()
       .showConfirmationModal({
         type: 'warning',
         header: 'Delete Cluster Binding',
-        body: `Are you sure you want to delete the cluster binding "${cb.metadata.name}" in namespace "${cb.metadata.namespace}"? This will disconnect the remote cluster.`,
+        body: `Are you sure you want to delete the cluster binding "${prettyName}" in namespace "${cb.metadata.namespace}"? This will disconnect the remote cluster.`,
         buttonConfirm: 'Delete',
         buttonDismiss: 'Cancel',
       })
@@ -279,7 +317,7 @@ export class ClusterBindingsComponent {
           next: (success) => {
             if (success) {
               LuigiClient.uxManager().showAlert({
-                text: `Cluster binding "${cb.metadata.name}" deleted`,
+                text: `Cluster binding "${prettyName}" deleted`,
                 type: 'success',
                 closeAfter: 3000,
               });

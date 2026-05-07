@@ -17,7 +17,7 @@
  */
 import { Injectable, inject } from '@angular/core';
 import { LuigiContextService } from '@luigi-project/client-support-angular';
-import { from, map, Observable, of, switchMap, catchError, filter } from 'rxjs';
+import { from, map, Observable, of, switchMap, catchError, filter, take } from 'rxjs';
 
 export interface SecretKeyRef {
   name: string;
@@ -225,6 +225,46 @@ export interface APIServiceExportRequestListResponse {
   };
 }
 
+export interface APIServiceExportResource {
+  group: string;
+  resource: string;
+  versions: string[];
+}
+
+export interface APIServiceExport {
+  metadata: {
+    name: string;
+    namespace?: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    informerScope?: string;
+    isolation?: string;
+    resources?: APIServiceExportResource[];
+  };
+  status?: {
+    conditions?: Array<{
+      type: string;
+      status: string;
+      reason?: string;
+      message?: string;
+      lastTransitionTime?: string;
+    }>;
+  };
+}
+
+export interface APIServiceExportListResponse {
+  kube_bind_io: {
+    v1alpha2: {
+      APIServiceExports: {
+        items: APIServiceExport[];
+      };
+    };
+  };
+}
+
 const LIST_BINDINGS_QUERY = `
   query ListBindings {
     kube_bind_io {
@@ -310,6 +350,7 @@ const LIST_CLUSTER_BINDINGS_QUERY = `
               namespace
               creationTimestamp
               labels
+              annotations
             }
             spec {
               kubeconfigSecretRef {
@@ -471,7 +512,7 @@ const CREATE_API_SERVICE_EXPORT_REQUEST_MUTATION = `
   mutation CreateAPIServiceExportRequest(
     $name: String!,
     $namespace: String!,
-    $resources: [KubeBindIoV1alpha2APIServiceExportRequestspecspecresourcesInput!]
+    $resources: [KubeBindIoV1alpha2APIServiceExportRequestSpecResourcesInput]
   ) {
     kube_bind_io {
       v1alpha2 {
@@ -504,6 +545,44 @@ const DELETE_API_SERVICE_EXPORT_REQUEST_MUTATION = `
   }
 `;
 
+const LIST_API_SERVICE_EXPORTS_QUERY = `
+  query ListAPIServiceExports {
+    kube_bind_io {
+      v1alpha2 {
+        APIServiceExports {
+          items {
+            metadata {
+              name
+              namespace
+              creationTimestamp
+              labels
+              annotations
+            }
+            spec {
+              informerScope
+              isolation
+              resources {
+                group
+                resource
+                versions
+              }
+            }
+            status {
+              conditions {
+                type
+                status
+                reason
+                message
+                lastTransitionTime
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 interface GraphQLConfig {
   endpoint: string;
   token: string | null;
@@ -523,6 +602,7 @@ export class BindingsService {
         console.log('[BindingsService] Context check:', { hasContext, ctx });
         return hasContext;
       }),
+      take(1),
       map((ctx) => {
         const context = ctx.context as any;
         const token = context.token || null;
@@ -543,6 +623,7 @@ export class BindingsService {
   public getCurrentUserEmail(): Observable<string | null> {
     return this.luigiContextService.contextObservable().pipe(
       filter((ctx) => !!ctx?.context),
+      take(1),
       map((ctx) => {
         const context = ctx.context as any;
         // Try various places where user email might be stored
@@ -909,6 +990,33 @@ export class BindingsService {
       catchError((error) => {
         console.error('Error deleting API service export request:', error);
         return of(false);
+      })
+    );
+  }
+
+  /**
+   * List all APIServiceExports across namespaces.
+   */
+  listAPIServiceExports(): Observable<APIServiceExport[]> {
+    console.log('[BindingsService] listAPIServiceExports called');
+    return this.getGraphQLConfig().pipe(
+      switchMap(({ endpoint, token }) =>
+        from(
+          fetch(endpoint, {
+            method: 'POST',
+            headers: this.buildHeaders(token),
+            body: JSON.stringify({
+              query: LIST_API_SERVICE_EXPORTS_QUERY,
+            }),
+          }).then((res) => res.json())
+        )
+      ),
+      map((response: { data: APIServiceExportListResponse }) => {
+        return response.data?.kube_bind_io?.v1alpha2?.APIServiceExports?.items || [];
+      }),
+      catchError((error) => {
+        console.error('Error fetching API service exports:', error);
+        return of([]);
       })
     );
   }

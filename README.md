@@ -36,10 +36,11 @@ KUBECONFIG=$PM_KUBECONFIG kubectl ws create kube-bind --type=root:provider --ent
 Seed kube-bind assets + platform-mesh.io assets into the provider workspace:
 
 TODO: This should be moved into providers bootstrap process, where secret is emitted out to the provider.
+For now backend does not need to have such high privileges, so we can run this separately with admin kubeconfig.
 
 ```bash
 go run cmd/init/main.go --kcp-kubeconfig $PM_KUBECONFIG \
-  --host-override=https://frontproxy-front-proxy.platform-mesh-system:6443
+  --host-override=https://frontproxy-front-proxy.platform-mesh-system:8443
 ```
 
 Extract the generated backend kubeconfig from kcp:
@@ -55,7 +56,7 @@ KUBECONFIG=$PM_KUBECONFIG \
 go run github.com/kube-bind/kube-bind/cmd/backend \
   --multicluster-runtime-provider kcp \
   --apiexport-endpoint-slice-name=kube-bind.io \
-  --external-address=https://frontproxy-front-proxy.platform-mesh-system:6443 \
+  --external-address=https://frontproxy-front-proxy.platform-mesh-system:8443 \
   --pretty-name="PlatformMesh.io" \
   --frontend-disabled=true \
   --namespace-prefix="kube-bind-" \
@@ -142,11 +143,17 @@ helm upgrade --install kube-bind-backend \
   -f deploy/helm/backend-values.yaml \
   -n kube-bind-system
 
-# Install using local chart with provider values (for development)
+# Install using local chart with provider values (for development).
+# Bootstrap is done out-of-cluster in step 2 above, so no init container is needed here.
+# `backend.image.tag` is the upstream backend tag — separate from $IMAGE_TAG which
+# only controls the provider-init/portal images built by `make images`.
 helm upgrade --install kube-bind-backend \
   ../../kube-bind/kube-bind/deploy/charts/backend \
   -f deploy/helm/backend-values.yaml \
-  -n kube-bind-system
+  -n kube-bind-system \
+  --set 'backend.image.repository=ghcr.io/mjudeikis/backend' \
+  --set 'backend.image.tag=v20260331' \
+  --set 'backend.image.pullPolicy=Always'
 ```
 
 ### Deploy Portal
@@ -155,11 +162,16 @@ helm upgrade --install kube-bind-backend \
 # Update chart dependencies
 make helm-deps
 
-# Install portal
+# Install portal (assumes IMAGE_TAG was exported above).
+# httpRoute + middleware are off by default; enable them so the portal is reachable
+# via the platform-mesh gateway. referenceGrant is gated on httpRoute.enabled and
+# defaults to true.
 helm upgrade --install kube-bind-portal \
   deploy/helm/kube-bind-portal \
   -n kube-bind-system \
-  --set image.tag="platform-mesh"
+  --set image.tag=$IMAGE_TAG \
+  --set httpRoute.enabled=true \
+  --set middleware.enabled=true
 ```
 
 ## Portal Features
@@ -176,3 +188,42 @@ helm upgrade --install kube-bind-portal \
 ## TODO
 
 - We need a way to produce Templates for services too. Some kind of modular UI or PM specific controller. Maybe a kube-bind/kcp converting apiexport to a template.
+
+To test this out, you can create some sample resources in the provider cluster (compute cluster) that the portal will pick up and display:
+
+```bash
+NAMESPACE=cowboys 
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: colt-45-permit
+  namespace: ${NAMESPACE}
+type: Opaque
+stringData:
+  serial_number: C45-123456
+  permit_date: "1881-04-15"
+  issued_by: Tombstone Marshal
+---
+apiVersion: wildwest.platform-mesh.io/v1alpha1
+kind: Cowboy
+metadata:
+  name: billy-the-kid
+  namespace: ${NAMESPACE}
+spec:
+  intent: Ride the range and protect the cattle
+  secretRefs:
+    - name: colt-45-permit       # exists -> green chip
+    - name: missing-saddlebag    # does NOT exist -> red chip
+---
+apiVersion: wildwest.platform-mesh.io/v1alpha1
+kind: Cowboy
+metadata:
+  name: lonely-ranger
+  namespace: ${NAMESPACE}
+spec:
+  intent: Ride alone
+  # no secretRefs -> Secret Refs row is hidden in the UI
+EOF
+```

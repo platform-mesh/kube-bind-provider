@@ -49,10 +49,10 @@
         @for (cb of clusterBindings(); track cb.metadata.namespace + '/' + cb.metadata.name) {
           <div class="binding-tile" [class]="getHealthClass(cb)" [class.highlighted]="isHighlighted(cb)" (click)="openClusterBindingDetails(cb)">
             <div class="tile-header">
-              <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(cb.metadata.name) }}"
-                [colorScheme]="getColorScheme(cb.metadata.name)"></ui5-avatar>
+              <ui5-avatar size="M" shape="Circle" initials="{{ getInitials(getClusterPrettyName(cb)) }}"
+                [colorScheme]="getColorScheme(getClusterPrettyName(cb))"></ui5-avatar>
               <div class="tile-title">
-                <ui5-title level="H6">{{ cb.metadata.name }}</ui5-title>
+                <ui5-title level="H6">{{ getClusterPrettyName(cb) }}</ui5-title>
                 <ui5-label class="namespace-label">{{ cb.metadata.namespace || 'default' }}</ui5-label>
               </div>
               <div class="tile-actions">
@@ -61,6 +61,18 @@
             </div>
 
             <div class="tile-content">
+              @if (getAuthor(cb)) {
+                <div class="tile-field">
+                  <ui5-label>Author</ui5-label>
+                  <ui5-text>{{ getAuthor(cb) }}</ui5-text>
+                </div>
+              }
+              @if (getIdentity(cb)) {
+                <div class="tile-field">
+                  <ui5-label>Identity</ui5-label>
+                  <ui5-text class="identity-value" [title]="getIdentity(cb)">{{ truncateIdentity(getIdentity(cb)) }}</ui5-text>
+                </div>
+              }
               @if (cb.spec.providerPrettyName) {
                 <div class="tile-field">
                   <ui5-label>Provider</ui5-label>
@@ -117,10 +129,10 @@
   <div class="dialog-content details-content">
     @if (selectedClusterBinding()) {
       <div class="binding-info-header">
-        <ui5-avatar size="M" shape="Circle" [initials]="getInitials(selectedClusterBinding()!.metadata.name)"
-          [colorScheme]="getColorScheme(selectedClusterBinding()!.metadata.name)"></ui5-avatar>
+        <ui5-avatar size="M" shape="Circle" [initials]="getInitials(getClusterPrettyName(selectedClusterBinding()!))"
+          [colorScheme]="getColorScheme(getClusterPrettyName(selectedClusterBinding()!))"></ui5-avatar>
         <div>
-          <ui5-title level="H5">{{ selectedClusterBinding()!.metadata.name }}</ui5-title>
+          <ui5-title level="H5">{{ getClusterPrettyName(selectedClusterBinding()!) }}</ui5-title>
           <ui5-label>{{ selectedClusterBinding()!.metadata.namespace || 'default' }}</ui5-label>
         </div>
         <div class="status-wrapper">
@@ -130,6 +142,110 @@
           </span>
         </div>
       </div>
+
+      <div class="dialog-section">
+        <ui5-title level="H6" class="section-title">Cluster</ui5-title>
+        <div class="dialog-fields">
+          @if (getAuthor(selectedClusterBinding()!)) {
+            <div class="tile-field">
+              <ui5-label>Author</ui5-label>
+              <ui5-text>{{ getAuthor(selectedClusterBinding()!) }}</ui5-text>
+            </div>
+          }
+          @if (getIdentity(selectedClusterBinding()!)) {
+            <div class="tile-field">
+              <ui5-label>Identity</ui5-label>
+              <ui5-text class="identity-value">{{ getIdentity(selectedClusterBinding()!) }}</ui5-text>
+            </div>
+          }
+          @if (selectedClusterBinding()!.spec.providerPrettyName) {
+            <div class="tile-field">
+              <ui5-label>Provider</ui5-label>
+              <ui5-text>{{ selectedClusterBinding()!.spec.providerPrettyName }}</ui5-text>
+            </div>
+          }
+          <div class="tile-field">
+            <ui5-label>Namespace</ui5-label>
+            <ui5-text>{{ selectedClusterBinding()!.metadata.namespace || 'default' }}</ui5-text>
+          </div>
+          <div class="tile-field">
+            <ui5-label>Resource Name</ui5-label>
+            <ui5-text>{{ selectedClusterBinding()!.metadata.name }}</ui5-text>
+          </div>
+          @if (selectedClusterBinding()!.metadata.creationTimestamp) {
+            <div class="tile-field">
+              <ui5-label>Created</ui5-label>
+              <ui5-text>{{ formatDate(selectedClusterBinding()!.metadata.creationTimestamp) }}</ui5-text>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="dialog-section">
+        <ui5-title level="H6" class="section-title">Connection</ui5-title>
+        <div class="dialog-fields">
+          @if (selectedClusterBinding()!.status?.konnectorVersion) {
+            <div class="tile-field">
+              <ui5-label>Konnector Version</ui5-label>
+              <ui5-text>{{ selectedClusterBinding()!.status?.konnectorVersion }}</ui5-text>
+            </div>
+          }
+          @if (selectedClusterBinding()!.status?.heartbeatInterval) {
+            <div class="tile-field">
+              <ui5-label>Heartbeat Interval</ui5-label>
+              <ui5-text>{{ selectedClusterBinding()!.status?.heartbeatInterval }}</ui5-text>
+            </div>
+          }
+          @if (selectedClusterBinding()!.status?.lastHeartbeatTime) {
+            <div class="tile-field">
+              <ui5-label>Last Heartbeat</ui5-label>
+              <ui5-text>{{ formatDate(selectedClusterBinding()!.status?.lastHeartbeatTime) }}</ui5-text>
+            </div>
+          }
+          @if (selectedClusterBinding()!.spec.kubeconfigSecretRef?.name) {
+            <div class="tile-field">
+              <ui5-label>Provider Kubeconfig Secret</ui5-label>
+              <ui5-text>{{ selectedClusterBinding()!.spec.kubeconfigSecretRef?.name }}</ui5-text>
+            </div>
+          }
+          @if (selectedClusterBinding()!.status?.consumerSecretRef?.name) {
+            <div class="tile-field">
+              <ui5-label>Consumer Kubeconfig Secret</ui5-label>
+              <ui5-text>{{ selectedClusterBinding()!.status?.consumerSecretRef?.namespace }}/{{ selectedClusterBinding()!.status?.consumerSecretRef?.name }}</ui5-text>
+            </div>
+          }
+        </div>
+      </div>
+
+      @if (selectedClusterBinding()!.status?.conditions?.length) {
+        <div class="dialog-section">
+          <ui5-title level="H6" class="section-title">Conditions</ui5-title>
+          <div class="conditions-list">
+            @for (cond of selectedClusterBinding()!.status?.conditions; track cond.type) {
+              <div class="condition-row" [class]="getConditionClass(cond)">
+                <div class="condition-head">
+                  <ui5-icon [name]="getConditionIcon(cond)" class="condition-icon"></ui5-icon>
+                  <span class="condition-type">{{ cond.type }}</span>
+                  <span class="condition-status-badge" [class]="getConditionClass(cond)">{{ cond.status }}</span>
+                  @if (cond.lastTransitionTime) {
+                    <ui5-label class="condition-time">{{ formatDate(cond.lastTransitionTime) }}</ui5-label>
+                  }
+                </div>
+                @if (cond.reason || cond.message) {
+                  <div class="condition-body">
+                    @if (cond.reason) {
+                      <ui5-label class="condition-reason">{{ cond.reason }}</ui5-label>
+                    }
+                    @if (cond.message) {
+                      <ui5-text class="condition-message">{{ cond.message }}</ui5-text>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       <!-- Configure remote cluster instruction -->
       <div class="instruction-block">

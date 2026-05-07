@@ -41,7 +41,7 @@
     <!-- API Bindings Section -->
     <div class="section-header">
       <ui5-title level="H5">API Bindings</ui5-title>
-      <ui5-label>Click on a binding to create an export request for remote clusters</ui5-label>
+      <ui5-label>Services available for users to bind into external clusters. Click on a binding to create an export request.</ui5-label>
     </div>
 
     @if (loading()) {
@@ -113,7 +113,7 @@
     <!-- Export Requests Section -->
     <div class="section-header export-section">
       <ui5-title level="H5">Export Requests</ui5-title>
-      <ui5-label>Active APIServiceExportRequests for remote cluster consumption</ui5-label>
+      <ui5-label>Binding requests in progress. These are ephemeral &mdash; once the request is implemented it will be removed.</ui5-label>
     </div>
 
     @if (loadingExportRequests()) {
