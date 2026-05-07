@@ -46,6 +46,7 @@ ingress:
 
 httpRoute:
   enabled: false
+  namespace: platform-mesh-system
   hostnames:
     - portal.localhost
     - "*.portal.localhost"
@@ -55,13 +56,19 @@ httpRoute:
       name: k8sapi-gateway
       namespace: platform-mesh-system
   pathPrefix: /kube-bind
-  filters: []
+  filters:
+    - extensionRef:
+        group: traefik.io
+        kind: Middleware
+        name: kube-bind-portal-cors
+      type: ExtensionRef
   referenceGrant:
     enabled: true
     fromNamespace: platform-mesh-system
 
 middleware:
   enabled: false
+  namespace: platform-mesh-system
   corsOrigins:
     - http://localhost:4300
     - https://portal.localhost:8443
