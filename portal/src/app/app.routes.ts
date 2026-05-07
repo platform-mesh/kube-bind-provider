@@ -7,7 +7,7 @@ import { ServiceMappingsComponent } from './service-mappings/service-mappings.co
 export const routes: Routes = [
   { path: '', redirectTo: 'requests', pathMatch: 'full' },
   { path: 'requests', component: BindingRequestsComponent },
-  { path: 'bindings', component: ClusterBindingsComponent },
+  { path: 'cluster-bindings', component: ClusterBindingsComponent },
   { path: 'service-mappings', component: ServiceMappingsComponent },
   { path: 'active-bindings', component: ActiveBindingsComponent },
   { path: '**', redirectTo: 'requests' },

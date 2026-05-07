@@ -162,7 +162,7 @@ export class ActiveBindingsComponent {
     event?.stopPropagation();
     const cb = group.clusterBinding;
     if (!cb) return;
-    this.router.navigate(['/bindings'], {
+    this.router.navigate(['/cluster-bindings'], {
       queryParams: {
         namespace: cb.metadata.namespace || '',
         highlight: cb.metadata.name || '',

@@ -286,7 +286,7 @@ export class BindingRequestsComponent {
       // Navigate using Angular router (within the same micro-frontend)
       const namespace = linkedBinding.metadata.namespace || '';
       const name = linkedBinding.metadata.name || '';
-      this.router.navigate(['/bindings'], {
+      this.router.navigate(['/cluster-bindings'], {
         queryParams: { namespace, highlight: name }
       });
     }
