@@ -139,7 +139,7 @@ kubectl create secret generic kube-bind-provider-kubeconfig \
 # Install using upstream chart with provider values
 helm upgrade --install kube-bind-backend \
   oci://ghcr.io/kube-bind/charts/backend \
-  --version 0.0.0-6f9a8da664039515d1eeac60ad9596b9f0202ec6 \
+  --version 0.0.0-57884df94d6440e2678cc054dc135505078defd7 \
   -f deploy/helm/backend-values.yaml \
   -n kube-bind-system
 
