@@ -23,7 +23,7 @@ spec:
                           "label": "Binding Requests",
                           "hideFromNav": false,
                           "icon": "document",
-                          "url": "https://{context.organization}.portal.localhost:8443/kube-bind/requests",
+                          "url": "http://localhost:4300/kube-bind/requests",
                           "entityType": "main.core_platform-mesh_io_account",
                           "order": 800,
                           "loadingIndicator": {
@@ -43,7 +43,7 @@ spec:
                           "label": "Cluster Bindings",
                           "hideFromNav": false,
                           "icon": "chain-link",
-                          "url": "https://{context.organization}.portal.localhost:8443/kube-bind/cluster-bindings",
+                          "url": "http://localhost:4300/kube-bind/cluster-bindings",
                           "entityType": "main.core_platform-mesh_io_account",
                           "order": 801,
                           "loadingIndicator": {
@@ -63,7 +63,7 @@ spec:
                           "label": "Service Mappings",
                           "hideFromNav": false,
                           "icon": "share-2",
-                          "url": "https://{context.organization}.portal.localhost:8443/kube-bind/service-mappings",
+                          "url": "http://localhost:4300/kube-bind/service-mappings",
                           "entityType": "main.core_platform-mesh_io_account",
                           "order": 802,
                           "loadingIndicator": {
@@ -83,7 +83,7 @@ spec:
                           "label": "Active Bindings",
                           "hideFromNav": false,
                           "icon": "connected",
-                          "url": "https://{context.organization}.portal.localhost:8443/kube-bind/active-bindings",
+                          "url": "http://localhost:4300/kube-bind/active-bindings",
                           "entityType": "main.core_platform-mesh_io_account",
                           "order": 803,
                           "loadingIndicator": {
