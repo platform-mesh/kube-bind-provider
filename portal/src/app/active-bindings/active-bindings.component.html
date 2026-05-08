@@ -214,7 +214,7 @@
                   <span class="resource-name">{{ r.resource }}</span>
                   <span class="resource-group">{{ r.group }}</span>
                 </div>
-                @if (r.versions?.length) {
+                @if (r.versions.length) {
                   <div class="resource-versions">
                     @for (v of r.versions; track v) {
                       <span class="version-chip">{{ v }}</span>
