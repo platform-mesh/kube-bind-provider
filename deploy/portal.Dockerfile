@@ -1,4 +1,4 @@
-FROM node:24.14 AS build
+FROM node:24.14@sha256:80fc934952c8f1b2b4d39907af7211f8a9fff1a4c2cf673fb49099292c251cec AS build
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ COPY portal/ .
 # Build the Angular application for production
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
 # Angular 17+ outputs to dist/<project>/browser
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist/kube-bind-portal/browser /usr/share/nginx/html
