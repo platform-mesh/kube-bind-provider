@@ -432,11 +432,11 @@ export class BindingRequestsComponent {
           });
         }
       },
-      error: () => {
+      error: (err: Error) => {
         LuigiClient.uxManager().showAlert({
-          text: 'Failed to create cluster binding request',
+          text: err?.message || 'Failed to create cluster binding request',
           type: 'error',
-          closeAfter: 3000,
+          closeAfter: 8000,
         });
       },
     });

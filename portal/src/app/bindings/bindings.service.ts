@@ -17,7 +17,7 @@
  */
 import { Injectable, inject } from '@angular/core';
 import { LuigiContextService } from '@luigi-project/client-support-angular';
-import { from, map, Observable, of, switchMap, catchError, filter, take } from 'rxjs';
+import { from, map, Observable, of, switchMap, catchError, filter, take, throwError } from 'rxjs';
 
 export interface SecretKeyRef {
   name: string;
@@ -765,13 +765,14 @@ export class BindingsService {
       map((response: any) => {
         if (response.errors) {
           console.error('GraphQL errors:', response.errors);
-          return false;
+          const message = response.errors.map((e: any) => e.message).filter(Boolean).join('; ');
+          throw new Error(message || 'Failed to create cluster binding request');
         }
         return !!response.data?.kube_bind_io?.v1alpha2?.createBindableResourcesRequest;
       }),
       catchError((error) => {
         console.error('Error creating binding:', error);
-        return of(false);
+        return throwError(() => error instanceof Error ? error : new Error(String(error)));
       })
     );
   }
