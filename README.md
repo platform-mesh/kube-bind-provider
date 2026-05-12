@@ -147,12 +147,13 @@ helm upgrade --install kube-bind-backend \
 # Bootstrap is done out-of-cluster in step 2 above, so no init container is needed here.
 # `backend.image.tag` is the upstream backend tag — separate from $IMAGE_TAG which
 # only controls the provider-init/portal images built by `make images`.
+# TODO: Once changes are released in kube-bind, we can move to official kube-bind image.
 helm upgrade --install kube-bind-backend \
   ../../kube-bind/kube-bind/deploy/charts/backend \
   -f deploy/helm/backend-values.yaml \
   -n kube-bind-system \
   --set 'backend.image.repository=ghcr.io/mjudeikis/backend' \
-  --set 'backend.image.tag=v20260331' \
+  --set 'backend.image.tag=v20260512' \
   --set 'backend.image.pullPolicy=Always'
 ```
 
@@ -185,9 +186,7 @@ helm upgrade --install kube-bind-portal \
 - Delete binding requests with confirmation
 - Phase status badges (pending, success, error)
 
-## TODO
-
-- We need a way to produce Templates for services too. Some kind of modular UI or PM specific controller. Maybe a kube-bind/kcp converting apiexport to a template.
+## Testing the Portal with Sample Resources
 
 To test this out, you can create some sample resources in the provider cluster (compute cluster) that the portal will pick up and display:
 
