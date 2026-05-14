@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/platform-mesh/kube-bind-provider-portal
   pullPolicy: IfNotPresent
-  tag: "@sha256:b4aa28c58431abe1a2a79e53f9578e23009053c95c58366a627fbfcae03d0749"
+  tag: "@sha256:4663d6229da76d1c4b3bfc1e8c844174c1d83c4bd770bc4dfae99f506ceb1e8d"
 
 imagePullSecrets: []
 nameOverride: ""
