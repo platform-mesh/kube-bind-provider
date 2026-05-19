@@ -51,11 +51,11 @@ require (
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-00010101000000-000000000000
 	github.com/spf13/pflag v1.0.10
-	k8s.io/api v0.36.0
-	k8s.io/apimachinery v0.36.0
-	k8s.io/apiserver v0.36.0
+	k8s.io/api v0.36.1
+	k8s.io/apimachinery v0.36.1
+	k8s.io/apiserver v0.36.1
 	k8s.io/client-go v1.5.2
-	k8s.io/component-base v0.36.0
+	k8s.io/component-base v0.36.1
 	k8s.io/klog/v2 v2.140.0
 )
 
