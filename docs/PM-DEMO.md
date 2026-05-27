@@ -62,7 +62,8 @@ Install the backend. Bootstrap was done out-of-cluster in step 2, so no init con
 
 ```bash
 helm upgrade --install kube-bind-backend \
-  ../../kube-bind/kube-bind/deploy/charts/backend \
+  oci://ghcr.io/kube-bind/charts/backend \
+  --version 0.8.1 \
   -f deploy/helm/backend-values.yaml \
   -n kube-bind-system \
   --set 'backend.image.repository=ghcr.io/kube-bind/backend' \
