@@ -132,6 +132,7 @@ The upstream kube-bind Helm chart is extended with `initContainers` support. Use
 ```bash
 # Create the kubeconfig secret
 kubectl create namespace kube-bind-system
+kubectl delete secret kube-bind-provider-kubeconfig -n kube-bind-system --ignore-not-found
 kubectl create secret generic kube-bind-provider-kubeconfig \
   --from-file=kubeconfig=backend.kubeconfig \
   -n kube-bind-system
@@ -139,8 +140,9 @@ kubectl create secret generic kube-bind-provider-kubeconfig \
 # Install using upstream chart with provider values
 helm upgrade --install kube-bind-backend \
   oci://ghcr.io/kube-bind/charts/backend \
-  --version 0.0.0-57884df94d6440e2678cc054dc135505078defd7 \
+  --version 0.8.1 \
   -f deploy/helm/backend-values.yaml \
+  --set backend.image.tag=v0.8.1 \
   -n kube-bind-system
 
 # Install using local chart with provider values (for development).
@@ -192,6 +194,7 @@ To test this out, you can create some sample resources in the provider cluster (
 
 ```bash
 NAMESPACE=cowboys 
+kubectl create ns $NAMESPACE
 
 kubectl apply -f - <<EOF
 apiVersion: v1
@@ -209,18 +212,18 @@ apiVersion: wildwest.platform-mesh.io/v1alpha1
 kind: Cowboy
 metadata:
   name: billy-the-kid
-  namespace: ${NAMESPACE}
 spec:
   intent: Ride the range and protect the cattle
   secretRefs:
     - name: colt-45-permit       # exists -> green chip
+      namespace: ${NAMESPACE}
     - name: missing-saddlebag    # does NOT exist -> red chip
+      namespace: ${NAMESPACE}
 ---
 apiVersion: wildwest.platform-mesh.io/v1alpha1
 kind: Cowboy
 metadata:
   name: lonely-ranger
-  namespace: ${NAMESPACE}
 spec:
   intent: Ride alone
   # no secretRefs -> Secret Refs row is hidden in the UI
