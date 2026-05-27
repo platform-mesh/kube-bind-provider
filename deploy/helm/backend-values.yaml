@@ -25,9 +25,9 @@ backend:
     - kube-bind.io
 
 image:
-  repository: ghcr.io/mjudeikis/backend
+  repository: ghcr.io/kube-bind/backend
   pullPolicy: Always
-  tag: "v20260331"
+  tag: "0.0.0-dfa3d5c84db3988a14fa8b27a8fedc9b6dd1c49e"
 
 # hostAliases to resolve kcp hostnames inside the cluster.
 # The IP should be the ClusterIP of the frontproxy-front-proxy service.
