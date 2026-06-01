@@ -512,7 +512,7 @@ const CREATE_API_SERVICE_EXPORT_REQUEST_MUTATION = `
   mutation CreateAPIServiceExportRequest(
     $name: String!,
     $namespace: String!,
-    $resources: [KubeBindIoV1alpha2APIServiceExportRequestSpecResourcesInput]
+    $resources: [KubeBindIoV1alpha2APIServiceExportRequestSpecResources_Input]
   ) {
     kube_bind_io {
       v1alpha2 {

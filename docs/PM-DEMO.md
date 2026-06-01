@@ -5,6 +5,8 @@ End-to-end demo path: bootstrap the provider workspace, build and load the provi
 For pure code iteration without rebuilding images, see [DEVELOPMENT.md](DEVELOPMENT.md).
 For just the image build and Helm reference, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
+We will be using 
+
 ## 1. Get the PlatformMesh Kubeconfig
 
 ```bash
@@ -24,7 +26,13 @@ KUBECONFIG=$PM_KUBECONFIG kubectl ws create providers --type=root:providers --en
 KUBECONFIG=$PM_KUBECONFIG kubectl ws create kube-bind --type=root:provider --enter --ignore-existing
 ```
 
-Seed kube-bind + platform-mesh.io assets into the provider workspace. The `--host-override` flag ensures the generated backend kubeconfig points at the front-proxy service, which is what the in-cluster backend will use to reach kcp.
+Seed kube-bind + platform-mesh.io assets into the provider workspace. The `--host-override` flag stamps the externally-reachable kcp hostname into the generated kubeconfig. We use `https://root.kcp.localhost:8443` because:
+
+- It is the SNI hostname the platform-mesh Istio gateway routes to the kcp root shard (`kcp-root-shard-tlsroute` in the `infra` chart). In this single-shard kind setup all workspaces live on the root shard, so path-based routing (`/clusters/<id>/...`) resolves correctly through it.
+- It is resolvable **inside** the provider cluster via the backend pod's `hostAliases` (mapped to the frontproxy ClusterIP — see [deploy/helm/backend-values.yaml](../deploy/helm/backend-values.yaml)).
+- It is resolvable **from a consumer kind cluster** by adding a `hostAlias` to the konnector pod pointing `root.kcp.localhost` at the host-gateway IP — the same trick contrib-examples uses for the api-syncagent (`contrib-examples/msp-postgres-localsetup/hack/syncagent-install.sh`).
+
+`https://localhost:8443` (the front-proxy TLSRoute hostname) does not work for consumer pods, because `localhost` already resolves to the pod itself and cannot be overridden via `hostAliases`.
 
 ```bash
 go run cmd/init/main.go --kcp-kubeconfig $PM_KUBECONFIG \
@@ -87,7 +95,6 @@ helm upgrade --install kube-bind-portal \
 Once the pods are healthy, exercise the portal with the sample resources from [DEVELOPMENT.md § Testing the Portal with Sample Resources](DEVELOPMENT.md#testing-the-portal-with-sample-resources).
 
 
-
 # Check 
 
 ```
@@ -96,3 +103,96 @@ NAME                                 READY   STATUS    RESTARTS   AGE
 kube-bind-backend-6786c7dc48-p6q7x   1/1     Running   0          114s
 kube-bind-portal-d66c5557c-sz8kp     0/1     Running   0          5s
 ```
+
+## 5. Create a Consumer Kind Cluster
+
+The platform-mesh kind cluster is the **provider** (runs kcp + the kube-bind backend + portal). To exercise the full bind flow we need a second, separate cluster — the **consumer** — where the konnector will run and where bound APIs become available.
+
+Create the consumer cluster:
+
+```bash
+kind create cluster --name kube-bind-consumer
+kind export kubeconfig --name kube-bind-consumer --kubeconfig consumer.kubeconfig
+export CONSUMER_KUBECONFIG="$(realpath consumer.kubeconfig)"
+```
+
+Confirm it is up:
+
+```bash
+KUBECONFIG=$CONSUMER_KUBECONFIG kubectl get nodes
+```
+
+### Networking note: resolving `root.kcp.localhost` from the consumer
+
+The kubeconfigs handed out by the provider's portal point at `https://root.kcp.localhost:8443`. Both kind clusters share the default `kind` docker network, and the platform-mesh kind cluster publishes 8443 on host loopback. The consumer's konnector reaches kcp by:
+
+1. Resolving `root.kcp.localhost` inside the konnector pod to the host-gateway IP (the IP `host.docker.internal` resolves to from inside the kind node). This must be set via `hostAliases` on the konnector deployment, because the name is not in any real DNS.
+2. The kind node forwards that to the host's published `127.0.0.1:8443`.
+3. The platform-mesh Istio gateway accepts the TLS handshake, routes by SNI `root.kcp.localhost` (`kcp-root-shard-tlsroute` in the `infra` chart), and lands on the root shard, which serves the workspace path embedded in the kubeconfig.
+
+Resolve the host-gateway IP dynamically from inside the consumer kind node and apply it as a `hostAlias` to the konnector deployment after `kubectl bind` installs it. The exact pattern is in `contrib-examples/msp-postgres-localsetup/hack/syncagent-install.sh` — same network topology, same SNI hostname, same trick.
+
+No extra kind-network configuration is needed beyond keeping both clusters on the default `kind` docker network.
+
+## 6. Bind APIs via the Portal UI
+
+Steps you will need to do in the platform-mesh portal:
+
+1. Get the consumer cluster identity with `kubectl bind cluster-identity` and create a `BindingRequest`. Wait until the status is `Success`.
+2. Click on it and "Copy binding file and deploy", then apply the copied YAML to the consumer cluster (`kubectl apply -f - --kubeconfig $CONSUMER_KUBECONFIG`).
+3. This will deploy the konnector. IMPORTANT: before the konnector becomes ready, patch the Deployment to add a `hostAlias` for `root.kcp.localhost`:
+
+```bash 
+# Resolve host-gateway IP from inside the consumer kind control-plane node.
+CONSUMER_NODE=kube-bind-consumer-control-plane
+HOSTGW_IP=$(docker exec "$CONSUMER_NODE" getent ahostsv4 host.docker.internal | awk 'NR==1 {print $1}')
+echo "host-gateway IP for consumer pods: $HOSTGW_IP"
+
+# Patch the konnector Deployment to resolve root.kcp.localhost -> host-gateway IP.
+KUBECONFIG=$CONSUMER_KUBECONFIG kubectl -n kube-bind patch deployment konnector \
+  --type=strategic \
+  -p "$(cat <<EOF
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: "$HOSTGW_IP"
+          hostnames:
+            - root.kcp.localhost
+EOF
+)"
+
+# Wait for the rollout.
+KUBECONFIG=$CONSUMER_KUBECONFIG kubectl -n kube-bind rollout status deployment/konnector
+```
+
+4. Once this works, you should see `ClusterBinding` `Ready` in the cluster-binding window. Click on it, copy the `APIServiceBindingBundle`, and apply it to the consumer cluster. This tells kube-bind that you agree to pull every API contract from the provider (platform-mesh) and bind it to the consumer cluster.
+
+These are one-time steps to establish trust and connectivity between the provider and consumer clusters. After this, any APIs the provider exposes and the consumer subscribes to will be automatically pushed and become available in the consumer cluster without needing to repeat these steps.
+
+5. In the `ServiceMappings` page you should now see one API available for your platform-mesh account — `postgresql.cnpg.io-postgresql.cnpg.io-jln62`. Click `+` and `Create Export Request`. This instructs kube-bind to push the contract to the consumer cluster.
+
+6. In the `Active Bindings` page, you should see one Active Binding per cluster. This confirms the external consumer is now linked to the platform-mesh account.
+
+On the consumer cluster:
+```bash
+KUBECONFIG=$CONSUMER_KUBECONFIG kubectl get crd | grep postgresql.cnpg.io 
+clusters.postgresql.cnpg.io             2026-06-01T12:23:22Z       
+```
+
+If you create an object in the consumer cluster:
+
+```bash
+KUBECONFIG=$CONSUMER_KUBECONFIG kubectl apply -f - <<EOF
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: my-postgres-cluster
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+EOF
+```
+
+then in the UI, with "All namespaces" selected on the Postgres tab, you should see the new resource synced back from the consumer cluster.
