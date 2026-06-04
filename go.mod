@@ -9,7 +9,7 @@ replace (
 	github.com/kcp-dev/sdk => github.com/kcp-dev/sdk v0.31.1
 )
 
-replace github.com/kube-bind/kube-bind/contrib/kcp => github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-20260507101203-7805dbe9d5f2
+replace github.com/kube-bind/kube-bind/contrib/kcp => github.com/kube-bind/kube-bind/contrib/kcp v0.0.0-20260528120500-beb7d578018a
 
 replace (
 	k8s.io/api => github.com/kcp-dev/kubernetes/staging/src/k8s.io/api v0.0.0-20260430062835-b63495f6b15b
