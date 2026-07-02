@@ -44,7 +44,7 @@ spec:
         name: kube-bind-backend
         registry: ghcr.io/platform-mesh
         component: github.com/platform-mesh/kube-bind-provider
-        version: "0.0.1"
+        version: "0.0.2"
         resourceName: backend-chart
         values:
           backend:
@@ -112,6 +112,7 @@ spec:
               hostnames:
                 - root.kcp.localhost
                 - triton.kcp.localhost
+                - nereus.kcp.localhost
                 - kcp.localhost
                 - localhost
 
@@ -122,7 +123,7 @@ spec:
         name: kube-bind-portal
         registry: ghcr.io/platform-mesh
         component: github.com/platform-mesh/kube-bind-provider
-        version: "0.0.1"
+        version: "0.0.2"
         resourceName: portal-chart
         values:
           httpRoute:
