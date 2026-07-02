@@ -35,9 +35,9 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	logsv1 "k8s.io/component-base/logs/api/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	logsv1 "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 
 	bootstrap "github.com/kube-bind/kube-bind/contrib/kcp/bootstrap"
@@ -97,38 +97,8 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	if seedWorkspaces {
-		// Standalone/admin flow: create the kube-bind workspace hierarchy under root, then
-		// bootstrap the kube-bind APIs into it. Requires a kubeconfig with root admin.
-		deploy.KubeBindRootClusterName = logicalcluster.NewPath("root:providers:kube-bind")
-		server, err := bootstrap.NewServer(ctx, config)
-		if err != nil {
-			return err
-		}
-		if err := server.Start(ctx); err != nil {
-			return err
-		}
-	} else {
-		// ManagedProvider flow: the operator already provisioned the provider workspace and
-		// handed us a kubeconfig scoped to it. Bootstrap the kube-bind APIs INTO that
-		// workspace — no workspace creation (the scoped service account can't create
-		// workspaces). Skip bootstrapconfig and retarget the core + kube-bind bootstrap at
-		// the workspace the kubeconfig points at.
-		current, err := currentWorkspace(options.KCPKubeConfig)
-		if err != nil {
-			return err
-		}
-		logger.Info("Bootstrapping into existing provider workspace", "cluster", current.String())
-		deploy.KubeBindRootClusterName = current
-		bootstrapcore.KubeBindRootClusterName = current
-
-		batteries := sets.New[string]()
-		if err := bootstrapcore.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
-			return fmt.Errorf("failed to bootstrap core APIs into provider workspace: %w", err)
-		}
-		if err := deploy.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
-			return fmt.Errorf("failed to bootstrap kube-bind APIs into provider workspace: %w", err)
-		}
+	if err := bootstrapProvider(ctx, config, seedWorkspaces, options.KCPKubeConfig); err != nil {
+		return err
 	}
 
 	// bootstrap provider-specific resources
@@ -204,6 +174,61 @@ func run(ctx context.Context) error {
 	return nil
 }
 
+// bootstrapProvider provisions the kube-bind APIs into the target workspace.
+//
+// When seedWorkspaces is true (standalone/admin) it creates the kube-bind workspace hierarchy
+// under root first, then bootstraps into it — this requires a kubeconfig with root admin.
+//
+// When false (ManagedProvider, the default) the operator has already provisioned the provider
+// workspace and handed us a kubeconfig scoped to it, so we bootstrap the kube-bind APIs INTO
+// that workspace without creating any workspaces (the scoped service account can't).
+func bootstrapProvider(ctx context.Context, config *bootstrap.Config, seedWorkspaces bool, kcpKubeconfig string) error {
+	logger := klog.FromContext(ctx)
+
+	if seedWorkspaces {
+		deploy.KubeBindRootClusterName = logicalcluster.NewPath("root:providers:kube-bind")
+		server, err := bootstrap.NewServer(ctx, config)
+		if err != nil {
+			return err
+		}
+		// TODO(upstream): server.Start always runs bootstrapconfig.Bootstrap, which creates the
+		// kube-bind workspace hierarchy under root. The ManagedProvider flow below has to skip
+		// that step (the scoped service account can't create workspaces), which is why it
+		// re-implements the remaining core + deploy bootstrap by hand. Add a skip-workspace-
+		// creation option to kube-bind's bootstrap.Config (Server already carries it, so Start
+		// keeps its signature) so both flows can share Start and this branch collapses to a
+		// single call.
+		return server.Start(ctx)
+	}
+
+	// Retarget the core + kube-bind bootstrap at the workspace the kubeconfig points at.
+	current, err := currentWorkspace(kcpKubeconfig)
+	if err != nil {
+		return err
+	}
+	logger.Info("Bootstrapping into existing provider workspace", "cluster", current.String())
+	deploy.KubeBindRootClusterName = current
+	bootstrapcore.KubeBindRootClusterName = current
+
+	// The core bootstrap creates a ServiceAccount and token Secret in the "default" namespace.
+	// In the seed flow the workspace is created as an organization type (which extends universal),
+	// so kcp's universal initializer provisions the default namespace for us. A provider workspace
+	// created out-of-band (kubectl ws create / operator-provisioned) may use a type that does not,
+	// so ensure it exists up front before the core bootstrap runs.
+	if err := ensureDefaultNamespace(ctx, config.ClientConfig, current); err != nil {
+		return fmt.Errorf("failed to ensure default namespace in provider workspace: %w", err)
+	}
+
+	batteries := sets.New[string]()
+	if err := bootstrapcore.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
+		return fmt.Errorf("failed to bootstrap core APIs into provider workspace: %w", err)
+	}
+	if err := deploy.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
+		return fmt.Errorf("failed to bootstrap kube-bind APIs into provider workspace: %w", err)
+	}
+	return nil
+}
+
 // currentWorkspace derives the logical cluster the kubeconfig is scoped to from its server
 // URL (the /clusters/<name> path segment). Used to bootstrap into the pre-provisioned
 // provider workspace under ManagedProvider, where we must not create workspaces.
@@ -221,6 +246,31 @@ func currentWorkspace(kubeconfigPath string) (logicalcluster.Path, error) {
 		return logicalcluster.None, fmt.Errorf("kubeconfig host %q has no /clusters/<name> path; cannot determine target workspace", cfg.Host)
 	}
 	return logicalcluster.NewPath(name), nil
+}
+
+// ensureDefaultNamespace creates the "default" namespace in the given workspace if it does not
+// already exist. The core kube-bind bootstrap expects it (it places a ServiceAccount and token
+// Secret there), but an out-of-band provisioned provider workspace does not have one.
+func ensureDefaultNamespace(ctx context.Context, restConfig *rest.Config, ws logicalcluster.Path) error {
+	logger := klog.FromContext(ctx)
+
+	wsConfig := *restConfig
+	wsConfig.Host = restConfig.Host + ws.RequestPath()
+	client, err := kubernetes.NewForConfig(&wsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create workspace-scoped kubernetes client: %w", err)
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	if _, err := client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{}); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			logger.V(2).Info("default namespace already exists", "cluster", ws.String())
+			return nil
+		}
+		return err
+	}
+	logger.Info("created default namespace", "cluster", ws.String())
+	return nil
 }
 
 // createBackendKubeconfigSecret creates a Secret containing a kubeconfig

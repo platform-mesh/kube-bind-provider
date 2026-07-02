@@ -39,6 +39,7 @@ hostAliases:
       - "portal.localhost"
       - "kcp.localhost"
       - "root.kcp.localhost"
+      - "triton.kcp.localhost"
 
 volumes:
   - name: kcp-kubeconfig
