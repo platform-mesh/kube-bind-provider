@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	confighelpers "github.com/kcp-dev/kcp/config/helpers"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 
 	bootstrap "github.com/kube-bind/kube-bind/contrib/kcp/bootstrap"
+	bootstrapcore "github.com/kube-bind/kube-bind/contrib/kcp/bootstrap/config/core"
 	"github.com/kube-bind/kube-bind/contrib/kcp/bootstrap/options"
 	deploy "github.com/kube-bind/kube-bind/contrib/kcp/deploy"
 
@@ -48,7 +50,8 @@ import (
 )
 
 var (
-	hostOverride string
+	hostOverride   string
+	seedWorkspaces bool
 )
 
 func main() {
@@ -66,6 +69,9 @@ func run(ctx context.Context) error {
 	options.AddFlags(pflag.CommandLine)
 	pflag.StringVar(&hostOverride, "host-override", os.Getenv("HOST_OVERRIDE"),
 		"Override the server URL in the generated backend kubeconfig (e.g. https://frontproxy-front-proxy.platform-mesh-system:6443)")
+	pflag.BoolVar(&seedWorkspaces, "seed-workspaces", false,
+		"Create the kube-bind workspace hierarchy under root before bootstrapping (standalone/admin use). "+
+			"When false (default, ManagedProvider) bootstrap into the existing provider workspace the kubeconfig points at.")
 	pflag.Parse()
 
 	logger := klog.FromContext(ctx)
@@ -76,10 +82,8 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	// override default workspace
-	deploy.KubeBindRootClusterName = logicalcluster.NewPath("root:providers:kube-bind")
-
-	// create init server
+	// Complete options and build the kcp client config. NewConfig strips the workspace path
+	// from the kubeconfig host, so the target workspace is derived separately below.
 	completed, err := options.Complete()
 	if err != nil {
 		return err
@@ -88,19 +92,43 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	// start server
 	config, err := bootstrap.NewConfig(completed)
 	if err != nil {
 		return err
 	}
 
-	server, err := bootstrap.NewServer(ctx, config)
-	if err != nil {
-		return err
-	}
+	if seedWorkspaces {
+		// Standalone/admin flow: create the kube-bind workspace hierarchy under root, then
+		// bootstrap the kube-bind APIs into it. Requires a kubeconfig with root admin.
+		deploy.KubeBindRootClusterName = logicalcluster.NewPath("root:providers:kube-bind")
+		server, err := bootstrap.NewServer(ctx, config)
+		if err != nil {
+			return err
+		}
+		if err := server.Start(ctx); err != nil {
+			return err
+		}
+	} else {
+		// ManagedProvider flow: the operator already provisioned the provider workspace and
+		// handed us a kubeconfig scoped to it. Bootstrap the kube-bind APIs INTO that
+		// workspace — no workspace creation (the scoped service account can't create
+		// workspaces). Skip bootstrapconfig and retarget the core + kube-bind bootstrap at
+		// the workspace the kubeconfig points at.
+		current, err := currentWorkspace(options.KCPKubeConfig)
+		if err != nil {
+			return err
+		}
+		logger.Info("Bootstrapping into existing provider workspace", "cluster", current.String())
+		deploy.KubeBindRootClusterName = current
+		bootstrapcore.KubeBindRootClusterName = current
 
-	if err := server.Start(ctx); err != nil {
-		return err
+		batteries := sets.New[string]()
+		if err := bootstrapcore.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
+			return fmt.Errorf("failed to bootstrap core APIs into provider workspace: %w", err)
+		}
+		if err := deploy.Bootstrap(ctx, config.KcpClusterClient, config.ApiextensionsClient, config.DynamicClusterClient, batteries); err != nil {
+			return fmt.Errorf("failed to bootstrap kube-bind APIs into provider workspace: %w", err)
+		}
 	}
 
 	// bootstrap provider-specific resources
@@ -174,6 +202,25 @@ func run(ctx context.Context) error {
 
 	logger.Info("Provider bootstrap completed successfully")
 	return nil
+}
+
+// currentWorkspace derives the logical cluster the kubeconfig is scoped to from its server
+// URL (the /clusters/<name> path segment). Used to bootstrap into the pre-provisioned
+// provider workspace under ManagedProvider, where we must not create workspaces.
+func currentWorkspace(kubeconfigPath string) (logicalcluster.Path, error) {
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return logicalcluster.None, fmt.Errorf("failed to load kubeconfig %q: %w", kubeconfigPath, err)
+	}
+	u, err := url.Parse(cfg.Host)
+	if err != nil {
+		return logicalcluster.None, fmt.Errorf("failed to parse kubeconfig host %q: %w", cfg.Host, err)
+	}
+	name := strings.Trim(strings.TrimPrefix(u.Path, "/clusters/"), "/")
+	if name == "" {
+		return logicalcluster.None, fmt.Errorf("kubeconfig host %q has no /clusters/<name> path; cannot determine target workspace", cfg.Host)
+	}
+	return logicalcluster.NewPath(name), nil
 }
 
 // createBackendKubeconfigSecret creates a Secret containing a kubeconfig

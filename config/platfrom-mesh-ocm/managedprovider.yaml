@@ -78,6 +78,10 @@ spec:
               image: ghcr.io/platform-mesh/kube-bind-provider-init:latest
               args:
                 - --kcp-kubeconfig=/etc/kube-bind/kubeconfig
+                # Bootstrap INTO the operator-provisioned provider workspace; do NOT create
+                # workspaces (the scoped SA can't, and the workspace already exists). Default,
+                # set explicitly for clarity.
+                - --seed-workspaces=false
                 # If the copied kubeconfig needs a different front-proxy host, add:
                 # - --host-override=https://frontproxy-front-proxy.platform-mesh-system:8443
               volumeMounts:
@@ -107,6 +111,7 @@ spec:
             - ip: "127.0.0.1" # PLACEHOLDER - overridden by kustomization.yaml patch
               hostnames:
                 - root.kcp.localhost
+                - triton.kcp.localhost
                 - kcp.localhost
                 - localhost
 
