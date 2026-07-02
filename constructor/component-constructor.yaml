@@ -1,0 +1,63 @@
+# OCM component descriptor for the PlatformMesh kube-bind provider.
+#
+# Templated by `make ocm-build` (go templater). This is a SELF-CONTAINED component: it
+# bundles both the upstream kube-bind artifacts (backend chart + image, referenced by OCI)
+# and this repo's own artifacts (portal chart, init + portal images). The kcp bootstrap
+# manifests are not shipped separately — the init image already embeds them via go:embed.
+#
+# Every chart and image is referenced as an OCI artifact (our portal chart is packaged and
+# pushed by `make helm-push` first). `make ocm-push` then transfers with --copy-resources,
+# relocating all referenced artifacts into $(OCM_REPO) — so the whole provider resolves from
+# our own registry (ghcr.io/platform-mesh). The ManagedProvider (config/platfrom-mesh-ocm)
+# then pulls every runtime deployment from this one component.
+components:
+  - name: github.com/platform-mesh/kube-bind-provider
+    version: {{ .VERSION }}
+    provider:
+      name: platform-mesh
+    resources:
+      # ---- Helm charts -----------------------------------------------------
+      # Upstream kube-bind backend chart, referenced by OCI (relation: external). Pulled
+      # into the component and relocated to our registry on `ocm transfer --copy-resources`.
+      - name: backend-chart
+        type: helmChart
+        version: {{ .BACKEND_CHART_VERSION }}
+        relation: external
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/kbind-dev/charts/backend:{{ .BACKEND_CHART_VERSION }}
+      # Our portal chart, referenced as an OCI Helm artifact. It is packaged and pushed to
+      # our chart registry by `make helm-push` (a prerequisite of `ocm-build`), then bundled
+      # here by reference and relocated with the component on `ocm transfer --copy-resources`.
+      - name: portal-chart
+        type: helmChart
+        version: {{ .CHART_VERSION }}
+        relation: local
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/platform-mesh/kube-bind-provider/charts/kube-bind-portal:{{ .CHART_VERSION }}
+
+      # ---- Container images ------------------------------------------------
+      # Upstream backend image (relation: external), bundled/relocated with the component.
+      - name: backend-image
+        type: ociImage
+        relation: external
+        version: {{ .BACKEND_IMAGE_TAG }}
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/kbind-dev/backend:{{ .BACKEND_IMAGE_TAG }}
+      # This repo's own images (relation: local).
+      - name: init-image
+        type: ociImage
+        relation: local
+        version: {{ .IMAGE_VERSION }}
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/platform-mesh/kube-bind-provider-init:{{ .OCI_TAG }}
+      - name: portal-image
+        type: ociImage
+        relation: local
+        version: {{ .IMAGE_VERSION }}
+        access:
+          type: ociArtifact
+          imageReference: ghcr.io/platform-mesh/kube-bind-provider-portal:{{ .OCI_TAG }}
