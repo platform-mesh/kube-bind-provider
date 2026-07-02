@@ -134,6 +134,85 @@ portal-stop:
 helm-deps:
 	helm dependency update deploy/helm/kube-bind-portal
 
+# OCM / Helm publishing parameters
+OCM ?= ocm
+HELM ?= helm
+OCM_REPO ?= ghcr.io/platform-mesh
+OCM_CTF ?= .ocm/transport.ctf
+# Component name (must match constructor/component-constructor.yaml).
+OCM_COMPONENT ?= github.com/platform-mesh/kube-bind-provider
+# Charts are published under this repo's own GHCR namespace (self-contained, alongside
+# the container images) rather than the shared helm-charts registry.
+HELM_REPO ?= ghcr.io/platform-mesh/kube-bind-provider/charts
+VERSION ?= 0.0.0-dev
+CHART_VERSION ?= $(VERSION)
+IMAGE_VERSION ?= $(VERSION)
+# OCI registry tag for the referenced local images (free-form, e.g. "latest" or "0.1.0").
+# Defaults to "latest" so local builds resolve against an existing tag; CI sets the release tag.
+OCI_TAG ?= latest
+# Upstream kube-bind artifacts bundled (by reference) into our OCM component and relocated
+# into $(OCM_REPO) on `ocm-push`. Keep in sync with each other and with the backend image
+# tag in config/platfrom-mesh-ocm/managedprovider.yaml.
+BACKEND_CHART_VERSION ?= 0.0.0-9aa7dc83de93180718abbb7e548161a003b8999a
+BACKEND_IMAGE_TAG ?= 0.0.0-6ac88b0f68dc5247c773dd6c3b3a0f44a64e9b1b
+# Charts this repo owns. The OCM component embeds them (input: helm) and publishes them as
+# OCI artifacts on `ocm-push`; `helm-push` is the standalone (non-OCM) publish path.
+HELM_CHARTS ?= kube-bind-portal
+
+## ocm-build: Build OCM component archive (CTF) from constructor/component-constructor.yaml
+# NOTE: the component references our portal chart as a published OCI artifact, so run
+# `make helm-push` first (or use `make ocm-release`, which chains them) — otherwise OCM
+# cannot resolve the portal chart's digest here.
+.PHONY: ocm-build
+ocm-build:
+	mkdir -p $(dir $(OCM_CTF))
+	rm -rf $(OCM_CTF)
+	$(OCM) add components -c --templater=go --file $(OCM_CTF) constructor/component-constructor.yaml -- \
+	  VERSION=$(VERSION) \
+	  CHART_VERSION=$(CHART_VERSION) \
+	  IMAGE_VERSION=$(IMAGE_VERSION) \
+	  OCI_TAG=$(OCI_TAG) \
+	  BACKEND_CHART_VERSION=$(BACKEND_CHART_VERSION) \
+	  BACKEND_IMAGE_TAG=$(BACKEND_IMAGE_TAG)
+
+## ocm-push: Transfer the OCM component to $(OCM_REPO), relocating ALL resources by-value
+# --copy-resources / --copy-local-resources pull the referenced external artifacts (upstream
+# backend chart + image) and this repo's images into $(OCM_REPO), and publish the embedded
+# charts as OCI artifacts there — making the component fully self-contained.
+.PHONY: ocm-push
+ocm-push: ocm-build
+	$(OCM) transfer ctf --overwrite --copy-resources --copy-local-resources $(OCM_CTF) $(OCM_REPO)
+
+## ocm-release: Full release path — push images, publish the portal chart, then build + push the OCM component
+# Prerequisites run in order: images-push → helm-push (portal chart as OCI) → ocm-push.
+.PHONY: ocm-release
+ocm-release: images-push helm-push ocm-push
+
+## ocm-describe: Print the locally built component descriptor
+.PHONY: ocm-describe
+ocm-describe: ocm-build
+	$(OCM) get componentversions --repo $(OCM_CTF) -o yaml
+
+## ocm-inspect: List the resources of the locally built OCM component (name/type/relation/access)
+.PHONY: ocm-inspect
+ocm-inspect: ocm-build
+	$(OCM) get resources --repo $(OCM_CTF) $(OCM_COMPONENT):$(VERSION) -o wide
+
+## helm-push: Package and push deployable Helm charts to $(HELM_REPO) as OCI artifacts
+.PHONY: helm-push
+helm-push:
+	mkdir -p $(BUILD_DIR)/charts
+	@for chart in $(HELM_CHARTS); do \
+	  echo "==> packaging $$chart $(CHART_VERSION)"; \
+	  $(HELM) dependency build deploy/helm/$$chart || exit 1; \
+	  $(HELM) package deploy/helm/$$chart \
+	    --version $(CHART_VERSION) \
+	    --app-version $(IMAGE_VERSION) \
+	    --destination $(BUILD_DIR)/charts || exit 1; \
+	  echo "==> pushing $$chart-$(CHART_VERSION).tgz to oci://$(HELM_REPO)"; \
+	  $(HELM) push $(BUILD_DIR)/charts/$$chart-$(CHART_VERSION).tgz oci://$(HELM_REPO) || exit 1; \
+	done
+
 ## help: Display this help
 .PHONY: help
 help:
