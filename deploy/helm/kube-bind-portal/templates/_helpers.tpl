@@ -58,3 +58,15 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Container image reference, handling both tag and digest (@sha256:...) formats.
+*/}}
+{{- define "kube-bind-portal.image" -}}
+{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- if hasPrefix "@" $tag -}}
+{{- printf "%s%s" .Values.image.repository $tag -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository $tag -}}
+{{- end -}}
+{{- end }}
