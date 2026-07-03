@@ -44,7 +44,7 @@ spec:
         name: kube-bind-backend
         registry: ghcr.io/platform-mesh
         component: github.com/platform-mesh/kube-bind-provider
-        version: "0.0.2"
+        version: "0.0.3"
         resourceName: backend-chart
         values:
           backend:
@@ -55,7 +55,7 @@ spec:
               tag: "0.0.0-6ac88b0f68dc5247c773dd6c3b3a0f44a64e9b1b"
             # kcp kubeconfig, mounted from the provider-kubeconfig secret below.
             kubeconfig: /etc/kube-bind/kubeconfig
-            externalAddress: https://root.kcp.localhost:8443
+            externalAddress: https://kcp.api.portal.localhost:8443
             prettyName: PlatformMesh.io
             namespacePrefix: kube-bind-
             consumerScope: cluster
@@ -75,7 +75,7 @@ spec:
           # RBAC/ServiceAccount, then provisions the backend kubeconfig.
           initContainers:
             - name: bootstrap
-              image: ghcr.io/platform-mesh/kube-bind-provider-init:latest
+              image: ghcr.io/platform-mesh/kube-bind-provider-init:sha-10c60fe
               args:
                 - --kcp-kubeconfig=/etc/kube-bind/kubeconfig
                 # Bootstrap INTO the operator-provisioned provider workspace; do NOT create
@@ -113,6 +113,7 @@ spec:
                 - root.kcp.localhost
                 - triton.kcp.localhost
                 - nereus.kcp.localhost
+                - kcp.api.portal.localhost
                 - kcp.localhost
                 - localhost
 
@@ -123,7 +124,7 @@ spec:
         name: kube-bind-portal
         registry: ghcr.io/platform-mesh
         component: github.com/platform-mesh/kube-bind-provider
-        version: "0.0.2"
+        version: "0.0.3"
         resourceName: portal-chart
         values:
           httpRoute:
