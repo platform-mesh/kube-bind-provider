@@ -203,6 +203,8 @@ ocm-inspect: ocm-build
 helm-push:
 	mkdir -p $(BUILD_DIR)/charts
 	@for chart in $(HELM_CHARTS); do \
+	  echo "==> stamping deploy/helm/$$chart image.tag=$(OCI_TAG)"; \
+	  yq -i 'with(select(.image != null); .image.tag = "$(OCI_TAG)")' deploy/helm/$$chart/values.yaml || exit 1; \
 	  echo "==> packaging $$chart $(CHART_VERSION)"; \
 	  $(HELM) dependency build deploy/helm/$$chart || exit 1; \
 	  $(HELM) package deploy/helm/$$chart \

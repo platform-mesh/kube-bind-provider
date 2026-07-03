@@ -10,6 +10,10 @@
 # relocating all referenced artifacts into $(OCM_REPO) — so the whole provider resolves from
 # our own registry (ghcr.io/platform-mesh). The ManagedProvider (config/platfrom-mesh-ocm)
 # then pulls every runtime deployment from this one component.
+#
+# OCI_TAG is the single source of truth for the deployed images: `make helm-push` stamps the
+# portal chart's image.tag to OCI_TAG, and the ociImage resources below reference the same
+# tag — so the portal-image resource and the image the chart actually deploys stay in lockstep.
 components:
   - name: github.com/platform-mesh/kube-bind-provider
     version: {{ .VERSION }}
